@@ -139,44 +139,43 @@ async function sendMessage() {
 /* Card base styling */
 .support-intro,
 .message-box {
-  background-color: #2b2b3a;
-  border-radius: 12px;
-  color: #e0aaff;
+  background-color: var(--surface0);
+  border-radius: var(--radius-md);
+  color: var(--text);
 }
 
 /* Title text (highlighted) */
 .section-title {
-  color: #e0aaff;
-  font-size: 1.05rem;
-  font-weight: bold;
+  color: var(--mauve);
+  font-size: var(--font-md);
+  font-weight: var(--font-weight-bold);
 }
 
 /* Paragraph description */
 .support-intro p {
-  color: #ccc;
-  font-size: 0.95em;
+  color: var(--subtext0);
+  font-size: var(--font-base);
 }
 
 /* Search bar styling */
 .search-item {
-  background: #2b2b3a;
-  margin-bottom: 1rem;
-  border-radius: 8px;
+  background: var(--surface0);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-sm);
 }
 
 /* FAQ section spacing */
 ion-accordion-group {
-  margin-top: 1rem;
-  margin-bottom: 2rem;
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 /* Button styled like Chronogram */
 .send-button {
-  margin-top: 1rem;
-  --background: #c18aff;
-  --background-hover: #d7aaff;
-  --color: white;
-  font-weight: bold;
-  border-radius: 12px;
+  margin-top: var(--space-4);
+  --background: var(--gradient-pink-mauve);
+  --color: var(--crust);
+  font-weight: var(--font-weight-bold);
+  --border-radius: var(--radius-md);
 }
 </style>

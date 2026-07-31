@@ -8,7 +8,7 @@
             <ion-icon slot="icon-only" :icon="arrowBackOutline" class="back-icon" />
           </ion-button>
         </ion-buttons>
-        <ion-title class="page-title">Change Password</ion-title>
+        <ion-title class="ion-text-center title-peach">Change Password</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -23,10 +23,15 @@
               placeholder="Enter new password"
           ></ion-input>
           <ion-icon
-              :icon="eyeOutline"
+              :icon="showNewPassword ? eyeOffOutline : eyeOutline"
               slot="end"
               class="eye-icon"
+              role="button"
+              tabindex="0"
+              :aria-label="showNewPassword ? 'Hide password' : 'Show password'"
               @click="toggleNewPassword"
+              @keydown.enter="toggleNewPassword"
+              @keydown.space.prevent="toggleNewPassword"
           />
         </ion-item>
 
@@ -39,10 +44,15 @@
               placeholder="Confirm new password"
           ></ion-input>
           <ion-icon
-              :icon="eyeOutline"
+              :icon="showConfirmPassword ? eyeOffOutline : eyeOutline"
               slot="end"
               class="eye-icon"
+              role="button"
+              tabindex="0"
+              :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
               @click="toggleConfirmPassword"
+              @keydown.enter="toggleConfirmPassword"
+              @keydown.space.prevent="toggleConfirmPassword"
           />
         </ion-item>
 
@@ -58,7 +68,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { eyeOutline, arrowBackOutline } from 'ionicons/icons'
+import { eyeOutline, eyeOffOutline, arrowBackOutline } from 'ionicons/icons'
 
 // Navigation
 const router = useRouter()
@@ -81,40 +91,35 @@ const toggleConfirmPassword = () => {
 </script>
 
 <style scoped>
-.page-title {
-  text-align: center;
-  font-size: 1.2rem;
-  color: #e0aaff;
-}
-
 .form-wrapper {
-  margin-top: 2rem;
+  margin-top: var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 0 1.5rem;
+  gap: var(--space-5);
+  padding: 0 var(--space-5);
+  max-width: 450px;
+  margin-inline: auto;
 }
 
 /* Eye icon color and size */
 .eye-icon {
-  color: #ca9e8a;
+  color: var(--peach);
   font-size: 1.3rem;
   cursor: pointer;
 }
 
 /* Button styling */
 .submit-btn {
-  --background: #c18aff;
-  --background-hover: #d7aaff;
-  --color: white;
-  font-weight: 600;
-  border-radius: 20px;
-  margin-top: 2rem;
+  --background: var(--gradient-pink-mauve);
+  --color: var(--crust);
+  font-weight: var(--font-weight-semibold);
+  --border-radius: var(--radius-pill);
+  margin-top: var(--space-6);
 }
 
 /* Back button icon color */
 .back-icon {
   font-size: 1.4rem;
-  color: var(--peach, #fab387); /* fallback peach */
+  color: var(--peach);
 }
 </style>

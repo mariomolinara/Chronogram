@@ -47,27 +47,48 @@
               </ion-card>
             </div>
           </transition-group>
-          <div v-if="activities.length === 0 && !isLoading" class="ion-text-center ion-padding">
-            <ion-text color="medium">No activities for today.</ion-text>
+          <!-- Error state -->
+          <div v-if="loadError && !isLoading" class="state-block">
+            <ion-icon :icon="alertCircleOutline" aria-hidden="true" />
+            <ion-text>Couldn't load your activities.</ion-text>
+            <ion-button fill="outline" size="small" @click="fetchActivities">Retry</ion-button>
+          </div>
+
+          <!-- Empty state -->
+          <div
+              v-else-if="activities.length === 0 && !isLoading"
+              class="state-block"
+          >
+            <ion-icon :icon="calendarClearOutline" aria-hidden="true" />
+            <ion-text>No activities for today.</ion-text>
+            <ion-button fill="outline" size="small" @click="addActivity">Add your first activity</ion-button>
           </div>
         </div>
 
         <div class="bottom-icons-container">
-          <!-- Home icon (non-clickable) -->
-          <div class="bottom-icon left home-icon">
-            <ion-icon :icon="homeOutline" />
+          <!-- Home icon (current page, non-clickable) -->
+          <div class="bottom-icon left home-icon" aria-current="page">
+            <ion-icon :icon="homeOutline" aria-label="Home" />
           </div>
 
           <!-- Plus button (fixed position) -->
           <div class="bottom-icon center">
-            <ion-fab-button class="add-fab-btn" @click="addActivity">
-              <ion-icon :icon="addOutline" />
+            <ion-fab-button class="add-fab-btn" aria-label="Add activity" @click="addActivity">
+              <ion-icon :icon="addOutline" aria-hidden="true" />
             </ion-fab-button>
           </div>
 
           <!-- Settings icon (clickable) -->
-          <div class="bottom-icon settings-icon" @click="navigateTab({ detail: { value: 'settings' } })">
-            <ion-icon :icon="settingsOutline" />
+          <div
+              class="bottom-icon settings-icon"
+              role="button"
+              tabindex="0"
+              aria-label="Settings"
+              @click="navigateTab({ detail: { value: 'settings' } })"
+              @keydown.enter="navigateTab({ detail: { value: 'settings' } })"
+              @keydown.space.prevent="navigateTab({ detail: { value: 'settings' } })"
+          >
+            <ion-icon :icon="settingsOutline" aria-hidden="true" />
           </div>
         </div>
       </div>
@@ -93,7 +114,8 @@ import {
   IonLoading, IonToast, IonText, IonAlert
 } from '@ionic/vue';
 import {
-  homeOutline, settingsOutline, personCircleOutline, addOutline, trashBinOutline
+  homeOutline, settingsOutline, personCircleOutline, addOutline, trashBinOutline,
+  alertCircleOutline, calendarClearOutline
 } from 'ionicons/icons';
 import dayjs from 'dayjs';
 import { api } from '@/composables/useApi';
@@ -139,6 +161,7 @@ interface Activity {
 
 const activities = ref<Activity[]>([]);
 const isLoading = ref(false);
+const loadError = ref(false);
 const toast = ref({ open: false, message: '', color: 'danger' });
 
 const activityStore = useActivityStore();
@@ -245,6 +268,7 @@ function confirmDelete(activityId: number) {
 
 async function fetchActivities() {
   isLoading.value = true;
+  loadError.value = false;
   activities.value = [];
 
   const userId = 1; // ← Temporary hardcoded user ID
@@ -263,6 +287,7 @@ async function fetchActivities() {
     activities.value = data.data || [];
   } catch (err: any) {
     console.error('Activity fetch error:', err);
+    loadError.value = true;
     const message = err.response?.data?.message || err.message || 'Unexpected error';
     showToast(message, 'danger');
   } finally {
@@ -293,22 +318,22 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
 }
 .user-icon {
-  font-size: 2rem;
+  font-size: var(--font-2xl);
   color: var(--ion-color-primary);
 }
 
 /* Current Date Display */
 .current-date-display {
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-5);
 }
 .current-date-display h3 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: var(--font-lg);
   color: var(--text);
 }
 
@@ -346,11 +371,11 @@ onMounted(() => {
 .activity-bubble {
   flex: 1;
   margin-left: 64px;
-  --background: rgba(255,255,255,.03);
+  --background: var(--glass-bg-subtle);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,.12);
+  border: 1px solid var(--glass-border);
   border-left: 4px solid var(--stripe-color);
-  border-radius: 18px 18px 6px 18px;
+  border-radius: var(--radius-lg) var(--radius-lg) 6px var(--radius-lg);
 }
 .activity-bubble:hover {
   background: linear-gradient(
@@ -370,7 +395,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 30px 25px; /* Increased side padding and bottom padding */
+  padding: 0 var(--space-6) calc(var(--space-5) + env(safe-area-inset-bottom));
   z-index: 100;
 }
 
@@ -439,10 +464,10 @@ onMounted(() => {
 
 .action-buttons {
   position: absolute;
-  top: 30px;
-  right: 30px;
+  top: var(--space-2);
+  right: var(--space-2);
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   z-index: 10;
 }
 
@@ -451,8 +476,9 @@ onMounted(() => {
   --padding-end: 4px;
   --padding-top: 4px;
   --padding-bottom: 4px;
-  width: 28px;
-  height: 28px;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  margin: 0;
 }
 
 .activity-bubble {

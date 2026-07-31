@@ -1,2 +1,124 @@
 /* For information on how to create your own theme, please see:
 http://ionicframework.com/docs/theming/ */
+
+/* ╭──────────────────────────────────────────────────────────────╮
+   │ CHRONOGRAM DESIGN TOKENS                                       │
+   │ Consolidated spacing / radius / typography / elevation scale. │
+   │ Palette + Ionic color mapping live in catppuccin.scss.        │
+   │ Use these variables in the views instead of one-off values.   │
+   ╰──────────────────────────────────────────────────────────────╯ */
+:root {
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;  /*  4px */
+  --space-2: 0.5rem;   /*  8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.5rem;   /* 24px */
+  --space-6: 2rem;     /* 32px */
+  --space-8: 2.5rem;   /* 40px */
+  --space-10: 4rem;    /* 64px */
+
+  /* Radius scale */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
+
+  /* Typography scale */
+  --font-xs: 0.75rem;   /* 12px  captions, timestamps */
+  --font-sm: 0.8rem;    /* ~13px secondary text */
+  --font-base: 0.95rem; /* ~15px body / inputs */
+  --font-md: 1rem;      /* 16px  */
+  --font-lg: 1.2rem;    /* ~19px section titles */
+  --font-xl: 1.5rem;    /* 24px  page titles */
+  --font-2xl: 2rem;     /* 32px  hero */
+
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Elevation (shadows) */
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 14px -4px rgba(0, 0, 0, 0.25);
+  --shadow-glow: 0 0 12px -2px var(--mauve);
+
+  /* Glass surface tokens (theme-aware) */
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.03);
+  --glass-blur: 8px;
+
+  /* Minimum touch target (WCAG / Android) */
+  --touch-target: 44px;
+
+  /* Bottom nav / FAB clearance so scrollable content isn't hidden */
+  --bottom-nav-space: 100px;
+}
+
+/* ╭──────────────────────────────────────────────────╮
+   │ Shared page primitives — reusable across views.   │
+   ╰──────────────────────────────────────────────────╯ */
+
+/* Centered form/content column used by auth + account pages */
+.page-form-wrapper {
+  max-width: 450px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+/* Peach page/section title (used on auth + settings) */
+.title-peach {
+  color: var(--peach);
+}
+
+/* Muted helper/subtitle text with consistent contrast */
+.page-subtitle {
+  font-size: var(--font-base);
+  text-align: center;
+  margin: 0 0 var(--space-5);
+  color: var(--subtext0);
+}
+
+/* Reusable glass card container */
+.glass-card {
+  background-color: var(--surface0);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-sm);
+}
+
+/* Empty / error / loading state block, centered */
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  color: var(--subtext0);
+}
+.state-block ion-icon {
+  font-size: 2.5rem;
+  color: var(--overlay1);
+}
+
+/* Ensure interactive icon-only controls meet the touch target */
+.tap-target {
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+}
+
+/* Visible keyboard focus for accessibility (was relying on UA default) */
+a:focus-visible,
+ion-button:focus-visible,
+[button]:focus-visible,
+.bottom-icon:focus-visible,
+.logout-btn:focus-visible {
+  outline: 2px solid var(--peach);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}

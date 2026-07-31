@@ -15,7 +15,7 @@
           <ion-icon :icon="calendarOutline" class="header-icon" />
         </ion-buttons>
 
-        <ion-title></ion-title>
+        <ion-title>Calendar</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -51,8 +51,9 @@
           </div>
         </div>
       </div>
-      <div v-else class="no-events">
-        No activities for this day.
+      <div v-else class="state-block">
+        <ion-icon :icon="calendarClearOutline" aria-hidden="true" />
+        <span>No activities for this day.</span>
       </div>
     </ion-content>
   </ion-page>
@@ -64,7 +65,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle,
   IonContent, IonDatetime, IonIcon, IonButtons, IonButton
 } from '@ionic/vue'
-import { calendarOutline, arrowBackOutline } from 'ionicons/icons'
+import { calendarOutline, arrowBackOutline, calendarClearOutline } from 'ionicons/icons'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -104,22 +105,22 @@ const filteredEvents = computed(() =>
 .calendar-wrapper {
   display: flex;
   justify-content: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-5);
 }
 
 .calendar {
   max-width: 320px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background-color: var(--base);
 }
 
 .date-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 1.1rem;
+  gap: var(--space-2);
+  font-size: var(--font-lg);
   justify-content: center;
-  margin-bottom: 1.2rem;
+  margin-bottom: var(--space-5);
 }
 
 .date-icon {
@@ -139,16 +140,16 @@ const filteredEvents = computed(() =>
 .event-box {
   background-color: var(--surface1);
   border: 1px solid var(--overlay1);
-  border-radius: 16px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-sm);
 }
 
 .event-time {
-  font-weight: bold;
+  font-weight: var(--font-weight-bold);
   color: var(--subtext0);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .event-info {
@@ -158,7 +159,7 @@ const filteredEvents = computed(() =>
 }
 
 .event-title {
-  font-size: 1rem;
+  font-size: var(--font-md);
   color: var(--text);
 }
 
@@ -166,12 +167,5 @@ const filteredEvents = computed(() =>
   width: 10px;
   height: 10px;
   border-radius: 50%;
-}
-
-.no-events {
-  text-align: center;
-  margin-top: 2rem;
-  font-size: 0.95rem;
-  color: var(--subtext0);
 }
 </style>

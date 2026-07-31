@@ -82,8 +82,13 @@
               <ion-icon
                   slot="end"
                   :icon="showPassword ? eyeOffOutline : eyeOutline"
-                  @click="showPassword = !showPassword"
                   class="toggle-eye"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                  @click="showPassword = !showPassword"
+                  @keydown.enter="showPassword = !showPassword"
+                  @keydown.space.prevent="showPassword = !showPassword"
               />
             </ion-item>
 
@@ -252,16 +257,16 @@ async function handleRegister() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 0;
+  padding: var(--space-6) 0;
 }
 .registration-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-6);
 }
 .header-icon {
-  font-size: 4rem;
+  font-size: var(--space-10);
   color: var(--mauve);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 .form-wrapper {
   max-width: 450px;
@@ -270,12 +275,12 @@ async function handleRegister() {
 ion-item.glass-input {
   --inner-padding-top: 4px;
   --inner-padding-bottom: 4px;
-  --min-height: 48px;
-  font-size: 0.95rem;
+  --min-height: var(--touch-target);
+  font-size: var(--font-base);
 }
 ion-input,
 ion-select {
-  font-size: 0.95rem;
+  font-size: var(--font-base);
   --padding-start: 0;
   --padding-end: 0;
 }
@@ -292,16 +297,13 @@ ion-item.ion-invalid {
   text-align: start;
   font-size: inherit;
   color: var(--ion-text-color);
-  padding: 8px 0;
+  padding: var(--space-2) 0;
   min-height: calc(1em + 16px);
-}
-.title-peach {
-  color: var(--peach);
 }
 ion-icon.input-icon {
   color: var(--peach);
-  font-size: 1.2rem;
-  margin-right: 8px;
+  font-size: var(--font-lg);
+  margin-right: var(--space-2);
 }
 ion-icon.toggle-eye {
   color: var(--peach);

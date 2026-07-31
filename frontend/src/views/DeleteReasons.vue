@@ -1,7 +1,7 @@
 <template>
   <ion-page>
     <ion-header>
-      <ion-toolbar color="light">
+      <ion-toolbar>
         <ion-title>Request received</ion-title>
       </ion-toolbar>
     </ion-header>
@@ -53,22 +53,24 @@ const goToLogin = () => {
 .feedback-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  margin-top: 2rem;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  max-width: 450px;
+  margin-inline: auto;
 }
 
 .description {
-  font-size: 0.95rem;
-  color: var(--ion-color-medium);
+  font-size: var(--font-base);
+  color: var(--subtext0);
 }
 
 .reason-title {
-  font-weight: bold;
-  margin-top: 1rem;
-  font-size: 1rem;
+  font-weight: var(--font-weight-bold);
+  margin-top: var(--space-4);
+  font-size: var(--font-md);
 }
 
 .done-button {
-  margin-top: 1.5rem;
+  margin-top: var(--space-5);
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
   <ion-page>
     <ion-header>
-      <ion-toolbar color="dark">
+      <ion-toolbar>
         <ion-buttons slot="start">
           <ion-back-button default-href="/settings" />
         </ion-buttons>
@@ -67,17 +67,8 @@ const smsNotifs = ref(false);
 </script>
 
 <style scoped>
-.glass-card {
-  background-color: var(--surface0);
-  border-radius: 16px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
 .purple-icon {
-  color: #c39bd3; /* tono morado suave tipo 'Chronogram' */
+  color: var(--mauve);
   font-size: 1.5rem;
 }
 </style>

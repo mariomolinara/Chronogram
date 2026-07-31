@@ -90,16 +90,16 @@ const saveChanges = () => {
 <style scoped>
 .glass-card {
   background-color: var(--surface0);
-  border-radius: 16px;
-  padding: 1rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-sm);
 }
 
 .button-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 0 1rem;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
 }
 </style>

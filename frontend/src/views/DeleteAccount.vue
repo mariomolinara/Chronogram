@@ -1,7 +1,7 @@
 <template>
   <ion-page>
     <ion-header>
-      <ion-toolbar color="light">
+      <ion-toolbar>
         <ion-buttons slot="start">
           <ion-back-button default-href="/settings" />
         </ion-buttons>
@@ -45,25 +45,27 @@ const goToFeedback = () => {
 .delete-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
-  margin-top: 2rem;
+  gap: var(--space-5);
+  margin-top: var(--space-6);
+  max-width: 450px;
+  margin-inline: auto;
 }
 
 .title {
-  font-size: 1.2rem;
-  font-weight: bold;
+  font-size: var(--font-lg);
+  font-weight: var(--font-weight-bold);
 }
 
 .description {
-  font-size: 0.95rem;
-  color: var(--ion-color-medium);
+  font-size: var(--font-base);
+  color: var(--subtext0);
 }
 
 .delete-button {
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 }
 
 .cancel-button {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 </style>

@@ -107,20 +107,20 @@ const goBack = () => {
 
 <style scoped>
 .profile-icon {
-  font-size: 1.8rem;
+  font-size: var(--font-xl);
   color: var(--mauve);
 }
 ion-item.glass-input {
-  --inner-padding-top: 8px;
-  --inner-padding-bottom: 8px;
+  --inner-padding-top: var(--space-2);
+  --inner-padding-bottom: var(--space-2);
 }
 .custom-input-value {
   width: 100%;
   text-align: start;
   font-size: inherit;
   color: var(--ion-text-color);
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
   min-height: calc(1em + 16px);
 }
 </style>

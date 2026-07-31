@@ -28,8 +28,13 @@
               <ion-icon
                   slot="end"
                   :icon="showPassword ? eyeOffOutline : eyeOutline"
-                  @click="showPassword = !showPassword"
                   class="toggle-eye"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                  @click="showPassword = !showPassword"
+                  @keydown.enter="showPassword = !showPassword"
+                  @keydown.space.prevent="showPassword = !showPassword"
               />
             </ion-item>
 
@@ -196,18 +201,18 @@ async function handleResetPassword() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 0;
+  padding: var(--space-6) 0;
 }
 
 .registration-header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: var(--space-6);
 }
 
 .header-icon {
-  font-size: 4rem;
+  font-size: var(--space-10);
   color: var(--mauve);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--space-2);
 }
 
 .form-wrapper {
@@ -216,46 +221,42 @@ async function handleResetPassword() {
 }
 
 .reset-subtitle {
-  font-size: 0.95rem;
+  font-size: var(--font-base);
   text-align: center;
-  margin: 0 0 1.5rem;
-  color: var(--subtitle1);
+  margin: 0 0 var(--space-5);
+  color: var(--subtext0);
 }
 
 ion-item.glass-input {
   --inner-padding-top: 4px;
   --inner-padding-bottom: 4px;
-  --min-height: 48px;
-  font-size: 0.95rem;
+  --min-height: var(--touch-target);
+  font-size: var(--font-base);
 }
 
 ion-input {
-  font-size: 0.95rem;
+  font-size: var(--font-base);
   --padding-start: 0;
   --padding-end: 0;
 }
 
 .password-item ion-icon.toggle-eye {
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: var(--font-lg);
 }
 
 .error-message {
   color: var(--ion-color-danger);
-  font-size: 0.8rem;
-  padding-left: 16px;
-  padding-top: 4px;
-  margin-bottom: 1rem;
-}
-
-.title-peach {
-  color: var(--peach);
+  font-size: var(--font-sm);
+  padding-left: var(--space-4);
+  padding-top: var(--space-1);
+  margin-bottom: var(--space-4);
 }
 
 ion-icon.input-icon {
   color: var(--peach);
-  font-size: 1.2rem;
-  margin-right: 8px;
+  font-size: var(--font-lg);
+  margin-right: var(--space-2);
 }
 
 ion-icon.toggle-eye {
@@ -263,6 +264,6 @@ ion-icon.toggle-eye {
 }
 
 .pill-button {
-  --border-radius: 20px;
+  --border-radius: var(--radius-xl);
 }
 </style>

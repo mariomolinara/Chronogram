@@ -53,20 +53,36 @@
     <!-- Bottom Navigation - Updated to match style -->
     <div class="bottom-icons-container">
       <!-- Home icon (clickable) -->
-      <div class="bottom-icon home-icon" @click="goToHome" aria-label="Home">
-        <ion-icon :icon="homeOutline" />
+      <div
+          class="bottom-icon home-icon"
+          role="button"
+          tabindex="0"
+          aria-label="Home"
+          @click="goToHome"
+          @keydown.enter="goToHome"
+          @keydown.space.prevent="goToHome"
+      >
+        <ion-icon :icon="homeOutline" aria-hidden="true" />
       </div>
 
       <!-- Logout button (center) -->
       <div class="bottom-icon center">
-        <div class="logout-btn" @click="confirmLogout" aria-label="Sign Out">
-          <ion-icon :icon="exitOutline" color="danger" /> <!-- Added color="danger" here -->
+        <div
+            class="logout-btn"
+            role="button"
+            tabindex="0"
+            aria-label="Sign out"
+            @click="confirmLogout"
+            @keydown.enter="confirmLogout"
+            @keydown.space.prevent="confirmLogout"
+        >
+          <ion-icon :icon="exitOutline" color="danger" aria-hidden="true" />
         </div>
       </div>
 
-      <!-- Settings icon (highlighted) -->
-      <div class="bottom-icon settings-icon">
-        <ion-icon :icon="settingsOutline" />
+      <!-- Settings icon (current page, highlighted) -->
+      <div class="bottom-icon settings-icon" aria-current="page">
+        <ion-icon :icon="settingsOutline" aria-label="Settings" />
       </div>
     </div>
   </ion-page>
@@ -136,32 +152,27 @@ onMounted(() => {
 <style scoped>
 /* Safe padding for FAB and bottom nav */
 .content-safe-area {
-  --padding-bottom: 100px;
+  --padding-bottom: var(--bottom-nav-space);
 }
 
 /* Centered container for content */
 .settings-container {
   max-width: 450px;
   width: 100%;
-  margin: 1.5rem auto 0;
-  padding: 0 1rem;
+  margin: var(--space-5) auto 0;
+  padding: 0 var(--space-4);
   box-sizing: border-box;
-}
-
-/* Title color */
-.title-peach {
-  color: var(--peach, #fca17d);
 }
 
 /* Profile Header */
 .profile-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: 16px;
-  color: var(--text, #fff);
-  margin-bottom: 1rem;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  margin-bottom: var(--space-4);
   width: 100%;
   box-sizing: border-box;
 }
@@ -200,22 +211,22 @@ onMounted(() => {
   height: auto;
 }
 
-/* Glass effect reused */
+/* Glass effect reused (solid surface variant for the profile header div) */
 .glass-input {
-  background-color: var(--surface0, rgba(255, 255, 255, 0.06));
-  border-radius: 16px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: var(--surface0);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
 }
 
 .input-icon {
-  color: var(--peach, #fca17d);
-  font-size: 1.2rem;
+  color: var(--peach);
+  font-size: var(--font-lg);
 }
 
 .danger-text {
-  color: var(--red, #f45c5c) !important;
+  color: var(--red) !important;
 }
 
 .form-wrapper {
@@ -234,7 +245,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 30px 25px;
+  padding: 0 var(--space-6) calc(var(--space-5) + env(safe-area-inset-bottom));
   z-index: 100;
 }
 
