@@ -2,8 +2,15 @@
 # http://git-scm.com/docs/gitignore
 
 
+# Env files. VITE_API_BASE_URL is a plain URL (not a secret), so the
+# per-mode files below are versioned. Only local overrides stay ignored.
 *.env
 *.env.*
+!.env.example
+!.env.development
+!.env.production
+.env.local
+.env.*.local
 
 *~
 *.sw[mnpcod]

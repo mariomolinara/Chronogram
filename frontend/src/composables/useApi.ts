@@ -6,6 +6,28 @@ import { toastController } from '@ionic/vue'; // Controller per mostrare notific
 import { isPublicApiPath } from '@/constants/apiRoutes'; // Rotte pubbliche condivise
 
 /**
+ * URL base dell'API risolto dalle variabili d'ambiente Vite.
+ *
+ * Il valore proviene da `VITE_API_BASE_URL` (definito nei file `.env.*`) e
+ * DEVE includere il context-path del backend `/chronogram`, perché le chiamate
+ * usano path tipo `/api/auth/login` senza tale prefisso.
+ *
+ * Fallback difensivo: se la variabile non è definita (file `.env` mancante o
+ * mal configurato) emettiamo un warning chiaro e ripieghiamo su un base URL
+ * relativo (`/chronogram`). Così le richieste restano same-origin dietro nginx
+ * invece di puntare a `undefined/api/...`, e nessuna URL viene hardcodata.
+ */
+const resolvedBaseURL = import.meta.env.VITE_API_BASE_URL ?? '/chronogram';
+
+if (!import.meta.env.VITE_API_BASE_URL) {
+    console.warn(
+        '[useApi] VITE_API_BASE_URL non definita: fallback su "/chronogram" ' +
+        '(same-origin). Configura un file .env.* con VITE_API_BASE_URL ' +
+        '(es. http://localhost:8080/chronogram in sviluppo).'
+    );
+}
+
+/**
  * Creazione di un'istanza axios preconfigurata per l'API
  *
  * L'istanza viene configurata con:
@@ -15,7 +37,7 @@ import { isPublicApiPath } from '@/constants/apiRoutes'; // Rotte pubbliche cond
  * Questa istanza sarà utilizzata in tutta l'applicazione per le chiamate API
  */
 export const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL, // URL base dell'API da variabile d'ambiente
+    baseURL: resolvedBaseURL, // URL base dell'API da variabile d'ambiente (con fallback)
     headers: {
         'Content-Type': 'application/json', // Specifica che le richieste sono in JSON
     },
