@@ -3,54 +3,58 @@ services:
     container_name: chronogram-mysql
     image: mysql:8.0
     restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    # Variables are injected straight from the root .env file, so the stack works
+    # even when `docker compose up` is run WITHOUT `--env-file .env`.
+    env_file:
+      - ../.env
     ports:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./init/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      # $$ escapes to a literal $, so the shell inside the container expands the
+      # password from its own environment (loaded via env_file above).
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  tomcat:
-    build: .
-    container_name: docker-tomcat 
+  backend:
+    container_name: chronogram-backend
+    build:
+      context: ../backend
     restart: unless-stopped
     ports:
-      - "8080:8080"     # HTTP web app
-      - "8000:8000"     # Debug remoto
+      - "8080:8080"
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+    # All app config (JWT_SECRET_KEY, LLM_*, MAIL_*, CORS_*, MYSQL_*, ...) comes
+    # directly from the root .env via env_file — no dependency on `--env-file`.
+    env_file:
+      - ../.env
     environment:
-      DB_NAME: ${MYSQL_DATABASE}
-      DB_USER: ${MYSQL_USER}
-      DB_PASS: ${MYSQL_PASSWORD}
+      # Only the DB host/port on the Docker network need overriding here; the app
+      # falls back to MYSQL_DATABASE/MYSQL_USER/MYSQL_PASSWORD for the rest.
       DB_HOST: chronogram-mysql
-      DEBUG_MODE: ${DEBUG_MODE:-false}
-      LLM_API_KEY: ${LLM_API_KEY}
-      MAIL_HOST: ${MAIL_HOST}
-      MAIL_PORT: ${MAIL_PORT}
-      MAIL_USER: ${MAIL_USER}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      FIREBASE_CREDENTIAL_PATH: /run/secrets/firebase-service-account.json
+      DB_PORT: "3306"
     volumes:
-      - ./logs:/usr/local/tomcat/logs
-      - ../secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+      - ./logs:/app/logs
 
   nginx:
     image: nginx:latest
     container_name: chronogram-nginx
     restart: unless-stopped
     ports:
-      - "443:443"
       - "80:80"
+      - "443:443"
     depends_on:
-      - tomcat
+      - backend
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # For HTTPS on a public machine, place fullchain.pem/privkey.pem here and
+      # enable the 443 server block in nginx/conf.d/default.conf:
+      # - ./nginx/certs:/etc/nginx/certs:ro
 
 volumes:
   mysql-data:

@@ -180,7 +180,7 @@ const form = reactive({
   email: '', password: '', birthday: '', gender: ''
 });
 
-const toast = reactive({ open: false, message: '', color: 'danger' as const });
+const toast = reactive({ open: false, message: '', color: 'danger' as 'success' | 'danger' });
 
 /* ---------- computed ---------- */
 const formattedBirthday = computed(() => form.birthday);

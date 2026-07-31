@@ -11,12 +11,14 @@ target/
 # Env
 *.env
 *.env.*
-prod/.env.prod
+# ...but keep the documented example
+!.env.example
 
 secrets/
 
 # Artifacts
 chronogram.war
+chronogram.jar
 dump.sql
 
 # OS/system files

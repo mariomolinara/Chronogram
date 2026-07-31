@@ -3,6 +3,7 @@ import axios from 'axios'; // Libreria per effettuare chiamate HTTP
 import { useAuthStore } from '@/store/auth'; // Store Pinia per la gestione dell'autenticazione
 import { useRouter } from 'vue-router'; // Router di Vue per la navigazione
 import { toastController } from '@ionic/vue'; // Controller per mostrare notifiche toast
+import { isPublicApiPath } from '@/constants/apiRoutes'; // Rotte pubbliche condivise
 
 /**
  * Creazione di un'istanza axios preconfigurata per l'API
@@ -32,29 +33,14 @@ export const api = axios.create({
  */
 export function initApiInterceptors() {
 
-
     api.interceptors.request.use(
         config => {
             const authStore = useAuthStore();
-            const token = authStore.token || localStorage.getItem('jwtToken'); // Verifica entrambi
-            console.log('JWT Token:', token); // Aggiungi un log per verificare il token
-
-            // Rotte pubbliche da escludere dall'aggiunta del token
-            const publicPaths = [
-                '/api/auth/login',
-                '/api/auth/register',
-                '/api/auth/request-reset',
-                '/api/auth/reset-password',
-                '/api/llm/prompt'
-            ];
-
-            // Verifica se l'URL corrente è una di quelle pubbliche
-            const isPublic = publicPaths.some(publicPath =>
-                config.url?.includes(publicPath)
-            );
+            // Unica fonte di verità per il token: lo store `auth`.
+            const token = authStore.getToken();
 
             // Aggiungi il token solo se la rotta non è pubblica e se il token è presente
-            if (!isPublic && token) {
+            if (!isPublicApiPath(config.url) && token) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
 
@@ -62,7 +48,6 @@ export function initApiInterceptors() {
         },
         error => Promise.reject(error)
     );
-
 
     /**
      * Intercettore per le risposte
@@ -81,9 +66,6 @@ export function initApiInterceptors() {
             const authStore = useAuthStore();
             const router = useRouter();
 
-            // Log dell'errore completo in console per debug
-            console.error('[Axios Error]', error);
-
             /**
              * Gestione specifica per errori 401 Unauthorized
              *
@@ -93,8 +75,6 @@ export function initApiInterceptors() {
              * 3. Reindirizzo alla pagina di login (se non ci siamo già)
              */
             if (error.response && error.response.status === 401) {
-                console.warn('Authentication error: 401 Unauthorized. Logging out user.');
-
                 // Effettua il logout pulendo lo stato di autenticazione
                 await authStore.logout();
 
@@ -107,8 +87,8 @@ export function initApiInterceptors() {
                 toast.present();
 
                 // Reindirizza alla login solo se non siamo già sulla pagina di login
-                if (router.currentRoute.value.name !== 'login') {
-                    router.push({ name: 'login' });
+                if (router.currentRoute.value.name !== 'Login') {
+                    router.push({ name: 'Login' });
                 }
             }
 

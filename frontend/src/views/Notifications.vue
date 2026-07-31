@@ -33,6 +33,12 @@
   </ion-page>
 </template>
 
+<script lang="ts">
+// Nome multi-parola per soddisfare la regola ESLint vue/multi-word-component-names
+// senza rinominare il file (referenziato dal router).
+export default { name: 'NotificationsPage' };
+</script>
+
 <script setup lang="ts">
 import { ref } from 'vue';
 import {

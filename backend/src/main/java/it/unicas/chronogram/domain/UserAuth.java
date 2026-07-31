@@ -1,0 +1,55 @@
+package it.unicas.chronogram.domain;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+
+/**
+ * Authentication/credentials record for a user. Maps the {@code user_auth} table.
+ */
+@Entity
+@Table(name = "user_auth")
+@Getter
+@Setter
+@NoArgsConstructor
+public class UserAuth {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "user_id")
+    private Integer userId;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
+
+    @Column(name = "failed_login_attempts", nullable = false)
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
+    /** True if the account is currently within a lockout window. */
+    public boolean isLocked(Instant now) {
+        return lockedUntil != null
+                && lockedUntil.isAfter(LocalDateTime.ofInstant(now, java.time.ZoneId.systemDefault()));
+    }
+}

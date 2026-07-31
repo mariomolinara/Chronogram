@@ -1,10 +1,21 @@
-import { mount } from '@vue/test-utils'
-import HomePage from '@/views/HomePage.vue'
-import { describe, expect, test } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { useActivityStore } from '@/store/activityStore'
 
-describe('HomePage.vue', () => {
-  test('renders home vue', () => {
-    const wrapper = mount(HomePage)
-    expect(wrapper.text()).toMatch('Ready to create an app?')
+describe('activityStore', () => {
+  beforeEach(() => {
+    // Ogni test parte da una Pinia pulita e attiva
+    setActivePinia(createPinia())
+  })
+
+  test('needsRefresh defaults to false', () => {
+    const store = useActivityStore()
+    expect(store.needsRefresh).toBe(false)
+  })
+
+  test('needsRefresh can be toggled to request a refresh', () => {
+    const store = useActivityStore()
+    store.needsRefresh = true
+    expect(store.needsRefresh).toBe(true)
   })
 })

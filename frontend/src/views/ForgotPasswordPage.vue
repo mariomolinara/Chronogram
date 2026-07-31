@@ -61,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'; // Added reactive import
+import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonContent, IonList, IonItem, IonInput, IonIcon,
@@ -75,7 +75,7 @@ const router = useRouter();
 const isLoading = ref(false);
 const email = ref('');
 
-const toast = reactive({ open: false, message: '', color: 'danger' as const });
+const toast = reactive({ open: false, message: '', color: 'danger' as 'success' | 'danger' });
 
 /* ---------- computed ---------- */
 const isValidEmail = (e: string) =>

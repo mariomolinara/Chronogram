@@ -1,0 +1,83 @@
+spring:
+  application:
+    name: chronogram
+
+  datasource:
+    # DB_* take precedence; otherwise fall back to the MYSQL_* names that come
+    # from the shared .env (via docker-compose env_file), then to local defaults.
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:${MYSQL_DATABASE:chronogram}}?serverTimezone=Europe/Rome&useSSL=${DB_USE_SSL:false}&allowPublicKeyRetrieval=true
+    username: ${DB_USER:${MYSQL_USER:chronouser}}
+    password: ${DB_PASS:${MYSQL_PASSWORD:chronopass}}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+      pool-name: chronogram-pool
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Europe/Rome
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+server:
+  servlet:
+    context-path: /chronogram
+  error:
+    include-message: never
+    include-stacktrace: never
+
+# --- Application-specific configuration ---
+chronogram:
+  security:
+    jwt:
+      # HMAC secret; MUST be provided in production and be at least 32 bytes long.
+      secret: ${JWT_SECRET_KEY:}
+      # Access-token lifetime in milliseconds (default 24h).
+      expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+      issuer: chronogram
+    cors:
+      # Comma-separated allowlist of front-end origins. NEVER use "*" with credentials.
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8100,http://localhost:5173}
+  reset:
+    # Base URL used to build the reset link when the Origin header is absent.
+    fallback-base-url: ${APP_CANONICAL_URL:http://localhost:8100}
+    token-ttl-minutes: 30
+  llm:
+    api-url: ${LLM_API_URL:https://openrouter.ai/api/v1/chat/completions}
+    api-key: ${LLM_API_KEY:}
+    default-model: ${LLM_DEFAULT_MODEL:deepseek/deepseek-chat-v3-0324:free}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    mail:
+      # The SMTP server is only needed for password-reset emails; don't let its
+      # availability drive the overall health status.
+      enabled: false
+
+logging:
+  level:
+    it.unicas.chronogram: ${LOG_LEVEL:INFO}

@@ -252,7 +252,7 @@ const activity = reactive({
   location: '' as 'home' | 'work' | 'outside' | 'other' | '',
 });
 
-const toast = reactive({ open: false, message: '', color: 'danger' as const });
+const toast = reactive({ open: false, message: '', color: 'danger' as 'success' | 'danger' });
 
 const hasErrors = computed(() =>
     !activity.name.trim() ||
@@ -385,7 +385,7 @@ onMounted(() => {
     activity.activityTypeId = q.activityTypeId ? Number(q.activityTypeId) : null;
     activity.recurrence = (q.recurrence as 'R' | 'E') || '';
     activity.costEuro = (q.costEuro as string) || '';
-    activity.location = (q.location as string) || '';
+    activity.location = (q.location as 'home' | 'work' | 'outside' | 'other') || '';
   }
 });
 

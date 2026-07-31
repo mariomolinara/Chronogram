@@ -58,7 +58,7 @@
             id="birthday-datetime"
             presentation="date"
             v-model="selectedBirthday"
-            @ionChange="birthdayModal?.dismiss()"
+            @ionChange="birthdayModal?.$el.dismiss()"
             class="ion-dark"
             :interface-options="{ cssClass: 'catppuccin-datetime-overlay' }"
         />

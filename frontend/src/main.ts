@@ -28,22 +28,17 @@ const app = createApp(App);
 // ⿢ Crea Pinia separatamente
 const pinia = createPinia();
 
-// ⿣ Esporta Pinia per debug in dev
+// ⿣ Espone lo store Pinia e collega i devtools SOLO in sviluppo.
+// In produzione questo blocco viene escluso dal tree-shaking di Vite.
+if (import.meta.env.DEV) {
+  (window as unknown as { __PINIA__?: typeof pinia }).__PINIA__ = pinia;
 
-  console.log("💡 DEV mode: exposing pinia");
-
-  (window as any).__PINIA__ = pinia;
-
-  import('@vue/devtools').then((devtools) => {
-    if (typeof devtools.connect === 'function') {
-      devtools.connect('http://192.168.59.1:8098', 8098); // 🔧 IP VM
-    } else {
-      console.warn('connect() not available from @vue/devtools');
-    }
-  }).catch((err) => {
-    console.error('Failed to load Vue Devtools:', err);
+  // @vue/devtools si auto-inizializza all'import (nessun IP hardcodato:
+  // usare l'estensione browser o l'app standalone su localhost).
+  import('@vue/devtools').catch(() => {
+    /* devtools non disponibili: ininfluente per l'app */
   });
-
+}
 
 // ⿤ Monta tutti i plugin
 app.use(IonicVue);
