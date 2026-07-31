@@ -57,12 +57,26 @@ public class PasswordResetService {
             return;
         }
 
-        String selector = generateSecureString(16);
-        String verifier = generateSecureString(32);
         LocalDateTime now = LocalDateTime.now();
 
         PasswordResetToken token = tokenRepository.findByUserId(user.getUserId())
                 .orElseGet(PasswordResetToken::new);
+
+        // Per-account cooldown: if a reset token was issued very recently, ignore
+        // this request without generating a new token or sending another email.
+        // This throttles reset-email spam at the application layer (complementing
+        // nginx per-IP limits) while keeping the external response identical, so
+        // no account enumeration is possible.
+        if (token.getCreatedAt() != null
+                && token.getCreatedAt().isAfter(now.minusSeconds(resetProps.getRequestCooldownSeconds()))) {
+            log.info("Password reset for user_id={} throttled: within {}s cooldown",
+                    user.getUserId(), resetProps.getRequestCooldownSeconds());
+            return;
+        }
+
+        String selector = generateSecureString(16);
+        String verifier = generateSecureString(32);
+
         token.setUserId(user.getUserId());
         token.setSelector(selector);
         token.setVerifierHash(passwordEncoder.encode(verifier));

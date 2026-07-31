@@ -50,6 +50,14 @@ public class ChronogramProperties {
     public static class Reset {
         private String fallbackBaseUrl = "http://localhost:8100";
         private int tokenTtlMinutes = 30;
+        /**
+         * Minimum interval, in seconds, between two accepted password-reset
+         * requests for the same account. A second request within this window is
+         * silently ignored (no new token, no new email) to throttle reset-email
+         * spam at the application level, complementing nginx per-IP rate limits.
+         * The external response is unchanged, so no account enumeration occurs.
+         */
+        private int requestCooldownSeconds = 60;
     }
 
     @Getter

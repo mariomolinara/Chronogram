@@ -44,6 +44,7 @@ class PasswordResetServiceTest {
         ChronogramProperties props = new ChronogramProperties();
         props.getReset().setTokenTtlMinutes(30);
         props.getReset().setFallbackBaseUrl("http://fallback.local");
+        props.getReset().setRequestCooldownSeconds(60);
         service = new PasswordResetService(
                 userAuthRepository, tokenRepository, emailService, passwordEncoder, props);
     }
@@ -108,6 +109,45 @@ class PasswordResetServiceTest {
         ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
         verify(tokenRepository).save(tokenCaptor.capture());
         assertThat(tokenCaptor.getValue().getTokenId()).isEqualTo(99); // same row updated
+    }
+
+    @Test
+    void initiateThrottledWhenExistingTokenIsWithinCooldown() {
+        UserAuth user = activeUser();
+        PasswordResetToken recent = new PasswordResetToken();
+        recent.setTokenId(99);
+        recent.setUserId(11);
+        // Issued 10s ago; cooldown is 60s, so this request must be ignored.
+        recent.setCreatedAt(LocalDateTime.now().minusSeconds(10));
+        when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.findByUserId(11)).thenReturn(Optional.of(recent));
+
+        service.initiatePasswordReset("ada@example.com", "http://origin.local");
+
+        // No new token persisted, no new email sent.
+        verify(tokenRepository, never()).save(any());
+        verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void initiateAllowedWhenCooldownWindowExpired() {
+        UserAuth user = activeUser();
+        PasswordResetToken stale = new PasswordResetToken();
+        stale.setTokenId(99);
+        stale.setUserId(11);
+        // Issued 61s ago; cooldown is 60s, so a fresh token must be issued.
+        stale.setCreatedAt(LocalDateTime.now().minusSeconds(61));
+        when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.findByUserId(11)).thenReturn(Optional.of(stale));
+        when(passwordEncoder.encode(anyString())).thenReturn("verifier-hash");
+
+        service.initiatePasswordReset("ada@example.com", "http://origin.local");
+
+        ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
+        verify(tokenRepository).save(tokenCaptor.capture());
+        assertThat(tokenCaptor.getValue().getTokenId()).isEqualTo(99); // same row, refreshed
+        assertThat(tokenCaptor.getValue().getCreatedAt()).isAfter(LocalDateTime.now().minusSeconds(5));
+        verify(emailService).sendPasswordResetEmail(eq("ada@example.com"), anyString(), eq("http://origin.local"));
     }
 
     @Test

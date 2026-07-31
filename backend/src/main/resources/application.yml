@@ -62,6 +62,10 @@ chronogram:
     # Base URL used to build the reset link when the Origin header is absent.
     fallback-base-url: ${APP_CANONICAL_URL:http://localhost:8100}
     token-ttl-minutes: 30
+    # Minimum seconds between two accepted reset requests for the same account.
+    # A second request within this window is silently ignored (no new email/token),
+    # throttling reset-email spam without revealing whether the account exists.
+    request-cooldown-seconds: ${RESET_REQUEST_COOLDOWN_SECONDS:60}
   llm:
     api-url: ${LLM_API_URL:https://openrouter.ai/api/v1/chat/completions}
     api-key: ${LLM_API_KEY:}
