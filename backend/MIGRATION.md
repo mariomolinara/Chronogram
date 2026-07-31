@@ -75,3 +75,80 @@ Build the jar locally (optional, Docker does this automatically):
 ```bash
 cd backend && mvn clean package
 ```
+
+## Going live with HTTPS (production)
+
+The stack (`docker/docker-compose.yml`) runs **nginx** as a TLS-terminating
+reverse proxy in front of the backend. nginx listens on 80 (redirect → 443) and
+443 (TLS), forwarding to `chronogram-backend:8080` with the backend's context
+path `/chronogram` preserved. The backend runs the **`prod` profile**
+(`application-prod.yml`), which honours the `X-Forwarded-*` headers
+(`server.forward-headers-strategy=framework`), so password-reset links and any
+absolute URLs come out as `https://…`.
+
+### 1. Prerequisites (do these by hand)
+
+- **DNS**: point an `A`/`AAAA` record for your domain at the host's public IP.
+- **Firewall**: open TCP 80 and 443 on the host.
+- **Secrets** in `.env` (copied from `.env.example`, never committed):
+  - `JWT_SECRET_KEY` — strong, ≥ 32 bytes: `openssl rand -base64 48`
+  - `CORS_ALLOWED_ORIGINS` — the real front-end origin(s), e.g.
+    `https://app.example.com` (comma-separated, **never** `*`)
+  - `APP_CANONICAL_URL` — the public HTTPS URL, e.g. `https://app.example.com`
+  - `SPRING_PROFILES_ACTIVE=prod` (already the compose default)
+  - DB / LLM / mail secrets as usual
+
+### 2. Set your domain in nginx
+
+Edit `docker/nginx/conf.d/default.conf` and replace `your-domain.example`
+(the `server_name` in the 443 block) with your real domain.
+
+### 3. Obtain TLS certificates (Let's Encrypt / certbot)
+
+Certificates are read from `/etc/nginx/certs/{fullchain,privkey}.pem`, mounted
+from `docker/nginx/certs/` on the host. That directory is **git-ignored** — never
+commit private keys.
+
+Option A — one-shot with the standalone certbot (stop nginx briefly):
+
+```bash
+sudo certbot certonly --standalone -d app.example.com
+sudo cp /etc/letsencrypt/live/app.example.com/fullchain.pem docker/nginx/certs/
+sudo cp /etc/letsencrypt/live/app.example.com/privkey.pem   docker/nginx/certs/
+```
+
+Option B — webroot (no downtime; nginx serves the ACME challenge from
+`docker/nginx/certbot-webroot/`, already mounted at `/var/www/certbot`):
+
+```bash
+sudo certbot certonly --webroot -w docker/nginx/certbot-webroot -d app.example.com
+# then copy fullchain.pem / privkey.pem into docker/nginx/certs/ as above
+```
+
+Renewal: re-run certbot, refresh the two `.pem` files in `docker/nginx/certs/`,
+then `docker compose exec nginx nginx -s reload`.
+
+### 4. Bring the stack up
+
+```bash
+cd docker
+docker compose config      # validate compose + env interpolation
+docker compose up -d --build
+docker compose exec nginx nginx -t   # validate the nginx config
+```
+
+Verify:
+
+```bash
+curl -I  http://app.example.com/                     # 301 → https
+curl -sf https://app.example.com/chronogram/actuator/health   # {"status":"UP"}
+```
+
+### Notes / residual risks
+
+- **HSTS** is set to 6 months without `includeSubDomains`/`preload`; tighten only
+  once every subdomain is HTTPS-only.
+- The `/api/llm/**` endpoint is public by design — keep it behind rate limiting
+  before exposing it to the internet.
+- nginx has no global rate limiting configured; consider `limit_req` for
+  public auth/LLM routes.

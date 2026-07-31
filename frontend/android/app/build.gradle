@@ -1,8 +1,50 @@
 apply plugin: 'com.android.application'
 
+// --- Release signing config ---------------------------------------------
+// Credentials are NEVER hardcoded here. They are read (in priority order) from:
+//   1. android/keystore.properties  (git-ignored, see keystore.properties.example)
+//   2. Gradle properties / environment variables (CI-friendly):
+//        CHRONOGRAM_STORE_FILE, CHRONOGRAM_STORE_PASSWORD,
+//        CHRONOGRAM_KEY_ALIAS, CHRONOGRAM_KEY_PASSWORD
+// If no credentials are available the release build simply falls back to the
+// unsigned output (useful for local/debug pipelines) without breaking Gradle.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasKeystoreFile = keystorePropertiesFile.exists()
+if (hasKeystoreFile) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def resolveSigning = { String propKey, String envKey ->
+    if (hasKeystoreFile && keystoreProperties.getProperty(propKey) != null) {
+        return keystoreProperties.getProperty(propKey)
+    }
+    if (project.hasProperty(propKey)) {
+        return project.property(propKey)
+    }
+    return System.getenv(envKey)
+}
+
+def storeFileValue     = resolveSigning("storeFile",     "CHRONOGRAM_STORE_FILE")
+def storePasswordValue = resolveSigning("storePassword", "CHRONOGRAM_STORE_PASSWORD")
+def keyAliasValue      = resolveSigning("keyAlias",      "CHRONOGRAM_KEY_ALIAS")
+def keyPasswordValue   = resolveSigning("keyPassword",   "CHRONOGRAM_KEY_PASSWORD")
+def hasReleaseSigning  = storeFileValue != null && storePasswordValue != null &&
+                         keyAliasValue != null && keyPasswordValue != null
+
 android {
     namespace "it.unicas.chronogram"
     compileSdk rootProject.ext.compileSdkVersion
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(storeFileValue)
+                storePassword storePasswordValue
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            }
+        }
+    }
     defaultConfig {
         applicationId "it.unicas.chronogram"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -18,8 +60,17 @@ android {
     }
     buildTypes {
         release {
+            // Code shrinking/obfuscation is intentionally left OFF: Capacitor and
+            // its native plugins load classes via reflection and R8 can strip them
+            // without exhaustive keep-rules, breaking the WebView bridge. Enable
+            // only after adding and testing proper -keep rules in proguard-rules.pro.
             minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Applied only when release credentials are available (see top of file).
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

@@ -1,0 +1,56 @@
+# Production overrides — activate with SPRING_PROFILES_ACTIVE=prod.
+#
+# Everything here tightens the defaults in application.yml for a public,
+# TLS-terminated (nginx) deployment. Secrets and origins MUST come from the
+# environment; there are deliberately no localhost fallbacks in this profile.
+
+server:
+  # The app sits behind nginx, which terminates TLS. Tell Spring to honour the
+  # X-Forwarded-* headers so redirects/absolute URLs (e.g. password-reset links)
+  # use https and the real host. "framework" uses Spring's ForwardedHeaderFilter.
+  forward-headers-strategy: framework
+  # Do not leak the server implementation.
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+chronogram:
+  security:
+    jwt:
+      # No fallback: startup fails (JwtService) unless a strong >=32-byte secret
+      # is provided. Generate with: openssl rand -base64 48
+      secret: ${JWT_SECRET_KEY}
+    cors:
+      # Strict allowlist of the REAL front-end origin(s). Comma-separated, never
+      # "*", and required — no localhost default in production.
+      allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  reset:
+    # Canonical HTTPS URL of the front-end, used to build reset links when the
+    # Origin header is absent.
+    fallback-base-url: ${APP_CANONICAL_URL}
+
+# Actuator: only liveness/readiness health and info, over the normal port (behind
+# nginx). Health details are hidden from anonymous callers; nothing else exposed.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: false
+
+logging:
+  level:
+    root: WARN
+    it.unicas.chronogram: ${LOG_LEVEL:INFO}
+    # Never log SQL / bind parameters in production (would leak data).
+    org.hibernate.SQL: WARN
+    org.springframework.web: WARN

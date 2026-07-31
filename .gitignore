@@ -32,3 +32,17 @@ Dockerfile.old
 !docker/init/schema.sql
 
 docker/logs/
+
+# TLS certificates / private keys — never commit these
+docker/nginx/certs/
+docker/nginx/certbot-webroot/
+*.pem
+*.key
+
+# Android release signing — never commit secrets or keystores
+keystore.properties
+*.jks
+*.keystore
+# ...but keep the documented example
+!keystore.properties.example
+frontend/android/local.properties

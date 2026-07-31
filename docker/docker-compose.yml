@@ -38,6 +38,10 @@ services:
       # falls back to MYSQL_DATABASE/MYSQL_USER/MYSQL_PASSWORD for the rest.
       DB_HOST: chronogram-mysql
       DB_PORT: "3306"
+      # Activate the production profile (application-prod.yml) by default. Override
+      # to empty/"default" in .env for local runs. Requires JWT_SECRET_KEY,
+      # CORS_ALLOWED_ORIGINS and APP_CANONICAL_URL to be set in .env.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     volumes:
       - ./logs:/app/logs
 
@@ -52,9 +56,12 @@ services:
       - backend
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      # For HTTPS on a public machine, place fullchain.pem/privkey.pem here and
-      # enable the 443 server block in nginx/conf.d/default.conf:
-      # - ./nginx/certs:/etc/nginx/certs:ro
+      # TLS certificates for the 443 server block. Place fullchain.pem/privkey.pem
+      # in ./nginx/certs on the host (obtain them with Let's Encrypt / certbot —
+      # see backend/MIGRATION.md). This directory is git-ignored: never commit keys.
+      - ./nginx/certs:/etc/nginx/certs:ro
+      # Webroot for the Let's Encrypt http-01 challenge (certbot --webroot).
+      - ./nginx/certbot-webroot:/var/www/certbot:ro
 
 volumes:
   mysql-data:
