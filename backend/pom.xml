@@ -15,7 +15,11 @@
   <groupId>it.unicas</groupId>
   <artifactId>chronogram</artifactId>
   <version>2.0.0</version>
-  <packaging>jar</packaging>
+  <!-- WAR: deployed on an external Apache Tomcat (>=10.1, Jakarta EE 10). The
+       artifact name (finalName "chronogram") doubles as the Tomcat context path,
+       so the app answers under /chronogram exactly like the embedded setup.
+       The WAR stays executable (java -jar) for local runs. -->
+  <packaging>war</packaging>
   <name>Chronogram Backend</name>
   <description>Chronogram time-tracking REST backend (Spring Boot)</description>
 
@@ -29,6 +33,14 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- Provided by the external Tomcat in production; still bundled in the
+         executable WAR so `java -jar target/chronogram.war` keeps working. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-tomcat</artifactId>
+      <scope>provided</scope>
     </dependency>
 
     <!-- Persistence (JPA + Hibernate + HikariCP) -->

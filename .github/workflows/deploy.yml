@@ -1,0 +1,119 @@
+# Continuous deployment to devaidalab.unicas.it (Tomcat, port 8800).
+#
+# Trigger : every push to `main` (or manual run from the Actions tab).
+# Build   : frontend (Vite, base /chronogram/) baked into the Spring Boot WAR.
+# Deploy  : WAR copied via SSH, then the server-side script
+#           /usr/local/bin/chronogram-deploy.sh swaps it into Tomcat's webapps
+#           and waits for the health check. The database is NEVER touched by
+#           this pipeline: schema changes run only as Flyway versioned
+#           migrations at application startup (ddl-auto=validate).
+#
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   DEPLOY_HOST      devaidalab.unicas.it
+#   DEPLOY_USER      SSH user dedicated to deploys (e.g. "deploy")
+#   DEPLOY_SSH_KEY   private key (OpenSSH format) whose public half is in the
+#                    deploy user's ~/.ssh/authorized_keys
+#   DEPLOY_PORT      optional, defaults to 22
+#
+# Server-side prerequisites: see deploy/DEPLOY_DEVAIDALAB.md.
+
+name: Deploy to devaidalab
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-devaidalab
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build WAR (frontend + backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend (base /chronogram/)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build:web
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Bundle frontend into the WAR
+        run: |
+          rm -rf backend/src/main/resources/static
+          mkdir -p backend/src/main/resources/static
+          cp -r frontend/dist/. backend/src/main/resources/static/
+
+      - name: Backend tests + package
+        working-directory: backend
+        run: mvn -B verify
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chronogram-war
+          path: backend/target/chronogram.war
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to Tomcat (port 8800)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: chronogram-war
+
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${PORT:-22}" "$HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload WAR and swap it into Tomcat
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          PORT="${PORT:-22}"
+          scp -P "$PORT" -i ~/.ssh/deploy_key chronogram.war "$USER@$HOST:/tmp/chronogram-${GITHUB_SHA::12}.war"
+          # The script (root-owned, allowed via a NOPASSWD sudoers entry) stops
+          # Tomcat, replaces webapps/chronogram.war, restarts and polls
+          # http://127.0.0.1:8800/chronogram/actuator/health until UP.
+          ssh -p "$PORT" -i ~/.ssh/deploy_key "$USER@$HOST" \
+            "sudo /usr/local/bin/chronogram-deploy.sh /tmp/chronogram-${GITHUB_SHA::12}.war"
+
+      - name: Public health check
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS "https://$HOST/chronogram/actuator/health" | grep -q '"UP"'; then
+              echo "Health check OK"; exit 0
+            fi
+            sleep 5
+          done
+          echo "Health check FAILED"; exit 1

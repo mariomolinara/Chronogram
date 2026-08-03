@@ -46,3 +46,7 @@ keystore.properties
 # ...but keep the documented example
 !keystore.properties.example
 frontend/android/local.properties
+
+# Frontend bundle copied into the backend by CI before packaging the WAR —
+# always generated, never committed.
+backend/src/main/resources/static/

@@ -48,6 +48,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/api/llm/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/api/activities/**").authenticated()
+                        // Catch-all for any future /api endpoint added without an
+                        // explicit rule: never let it fall through to the public
+                        // static-resources matcher below.
+                        .requestMatchers("/api/**", "/actuator/**").authenticated()
+                        // The SPA bundle (index.html, /assets/**, icons) and its
+                        // client-side routes are public by nature; everything
+                        // sensitive lives under /api and is matched above.
+                        .requestMatchers(HttpMethod.GET, "/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

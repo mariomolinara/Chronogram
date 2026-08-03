@@ -1,0 +1,43 @@
+# systemd unit for the Tomcat instance dedicated to Chronogram (port 8800).
+#
+# Install (as root):
+#   cp chronogram-tomcat.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now chronogram-tomcat
+#
+# Assumes Tomcat >= 10.1 unpacked in /opt/tomcat, owned by user "tomcat", with
+# the HTTP connector on port 8800 (see DEPLOY_DEVAIDALAB.md) and the app
+# environment in /opt/chronogram/chronogram.env (chmod 600, root:tomcat —
+# it contains secrets).
+
+[Unit]
+Description=Apache Tomcat (Chronogram, port 8800)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=forking
+User=tomcat
+Group=tomcat
+
+Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+Environment=CATALINA_HOME=/opt/tomcat
+Environment=CATALINA_BASE=/opt/tomcat
+Environment=CATALINA_PID=/opt/tomcat/temp/tomcat.pid
+Environment=CATALINA_OPTS=-Xms256m -Xmx768m
+# All Chronogram settings (DB credentials, JWT secret, CORS, mail, LLM…):
+EnvironmentFile=/opt/chronogram/chronogram.env
+
+ExecStart=/opt/tomcat/bin/startup.sh
+ExecStop=/opt/tomcat/bin/shutdown.sh
+
+Restart=on-failure
+RestartSec=10
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/tomcat
+
+[Install]
+WantedBy=multi-user.target
