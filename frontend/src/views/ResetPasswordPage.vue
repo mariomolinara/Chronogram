@@ -85,13 +85,6 @@
       </div>
 
       <ion-loading :is-open="isLoading" message="Updating password..." />
-      <ion-toast
-          :is-open="toast.open"
-          :message="toast.message"
-          :color="toast.color"
-          :duration="2500"
-          @didDismiss="toast.open = false"
-      />
     </ion-content>
   </ion-page>
 </template>
@@ -101,11 +94,12 @@ import { ref, reactive, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonContent, IonList, IonItem, IonInput, IonIcon,
-  IonButton, IonGrid, IonRow, IonCol, IonSpinner, IonToast,
+  IonButton, IonGrid, IonRow, IonCol, IonSpinner,
   IonLoading
 } from '@ionic/vue';
 import { keyOutline, lockClosedOutline, eyeOutline, eyeOffOutline } from 'ionicons/icons';
 import { api } from '@/composables/useApi';
+import { useToast } from '@/composables/useToast';
 
 /* ---------- state ---------- */
 const route = useRoute();
@@ -124,11 +118,7 @@ const errors = reactive({
   confirmPassword: ''
 });
 
-const toast = reactive({
-  open: false,
-  message: '',
-  color: 'danger' as 'success' | 'danger'
-});
+const { showToast } = useToast();
 
 /* ---------- computed ---------- */
 const hasErrors = computed(() =>
@@ -158,12 +148,6 @@ const validatePassword = () => {
   if (form.confirmPassword && form.newPassword !== form.confirmPassword) {
     errors.confirmPassword = 'Passwords do not match';
   }
-};
-
-const showToast = (msg: string, col: 'success' | 'danger') => {
-  toast.message = msg;
-  toast.color = col;
-  toast.open = true;
 };
 
 /* ---------- password reset ---------- */

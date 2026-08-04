@@ -151,7 +151,6 @@
         />
       </ion-modal>
       <ion-loading :is-open="isLoading" message="Registering..." />
-      <ion-toast :is-open="toast.open" :message="toast.message" :color="toast.color" :duration="2500" @didDismiss="toast.open=false" />
     </ion-content>
   </ion-page>
 </template>
@@ -161,7 +160,7 @@ import { reactive, ref, computed } from 'vue';
 import {
   IonPage, IonContent, IonList, IonItem, IonInput, IonIcon,
   IonButton, IonGrid, IonRow, IonCol, IonSelect, IonSelectOption,
-  IonLabel, IonDatetime, IonModal, IonLoading, IonToast
+  IonLabel, IonDatetime, IonModal, IonLoading
 } from '@ionic/vue';
 import { useRouter } from 'vue-router';
 import {
@@ -172,6 +171,7 @@ import {
 } from 'ionicons/icons';
 import dayjs from 'dayjs';
 import { api } from '@/composables/useApi';
+import { useToast } from '@/composables/useToast';
 
 /* ---------- state ---------- */
 const router        = useRouter();
@@ -185,7 +185,7 @@ const form = reactive({
   email: '', password: '', birthday: '', gender: ''
 });
 
-const toast = reactive({ open: false, message: '', color: 'danger' as 'success' | 'danger' });
+const { showToast } = useToast();
 
 /* ---------- computed ---------- */
 const formattedBirthday = computed(() => form.birthday);
@@ -218,12 +218,6 @@ const onBirthdaySelected = () => {
     form.birthday = dayjs(dateIso.value).format('DD-MM-YYYY');
   }
   birthdayModal.value?.$el.dismiss();
-};
-
-const showToast = (msg: string, col: 'success' | 'danger') => {
-  toast.message = msg;
-  toast.color = col;
-  toast.open = true;
 };
 
 /* ---------- registration ---------- */

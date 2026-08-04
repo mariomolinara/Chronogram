@@ -57,14 +57,6 @@
         </div>
       </div>
 
-      <ion-toast
-          :is-open="showToast"
-          :message="toastMessage"
-          :color="toastColor"
-          :duration="3000"
-          @didDismiss="showToast = false"
-      ></ion-toast>
-
     </ion-content>
   </ion-page>
 </template>
@@ -73,9 +65,10 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
+import { useToast } from '@/composables/useToast';
 import {
   IonPage, IonContent, IonList, IonItem, IonInput, IonIcon,
-  IonButton, IonGrid, IonRow, IonCol, IonToast, IonSpinner // MODIFIED: Imported IonSpinner
+  IonButton, IonGrid, IonRow, IonCol, IonSpinner // MODIFIED: Imported IonSpinner
 } from '@ionic/vue';
 import { personOutline, keyOutline } from 'ionicons/icons';
 
@@ -88,16 +81,9 @@ const isLoading = ref(false);
 const email = ref('');
 const password = ref('');
 
-// Toast state
-const showToast = ref(false);
-const toastMessage = ref('');
-const toastColor = ref('danger');
-
-const presentToast = (message: string, color: string = 'danger') => {
-  toastMessage.value = message;
-  toastColor.value = color;
-  showToast.value = true;
-};
+// Feedback all'utente (vedi `useToast`: la variante dichiarativa non veniva
+// mai presentata).
+const { showToast: presentToast } = useToast();
 
 const handleLogin = async () => {
   if (!email.value.trim()) {

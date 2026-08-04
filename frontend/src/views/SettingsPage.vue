@@ -13,10 +13,10 @@
           <ion-icon :icon="personOutline" class="avatar-icon input-icon" aria-hidden="true" />
           <div class="name-container">
             <p class="hello">Hello</p>
-            <h2 class="name">User Name</h2>
+            <h2 class="name">{{ displayName }}</h2>
           </div>
-          <ion-button fill="clear" class="edit-button" @click="editProfile" aria-label="Edit profile">
-            <ion-icon :icon="createOutline" class="input-icon" />
+          <ion-button fill="clear" class="edit-button tap-target" aria-label="Edit profile" @click="goToEditProfile">
+            <ion-icon :icon="createOutline" class="input-icon" aria-hidden="true" />
           </ion-button>
         </div>
 
@@ -95,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonIcon,
@@ -111,6 +111,9 @@ import { useAuthStore } from '@/store/auth';
 
 const router = useRouter();
 const auth = useAuthStore();
+
+/** Identificativo dell'utente autenticato (vedi `displayName` nello store). */
+const displayName = computed(() => auth.displayName || '—');
 
 const goToHome = () => {
   router.push({ name: 'Home' });
@@ -151,10 +154,6 @@ const confirmLogout = async () => {
     ]
   });
   await alert.present();
-};
-
-const editProfile = () => {
-  console.log('Edit profile clicked');
 };
 
 onMounted(() => {

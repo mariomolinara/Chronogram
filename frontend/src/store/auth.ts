@@ -2,7 +2,12 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { Preferences } from '@capacitor/preferences';
 import { api } from '@/composables/useApi';
-import { useRouter } from 'vue-router';
+// Istanza singleton del router, non `useRouter()`: lo store viene creato dal
+// guard in `router/index.ts`, cioè fuori da un `setup()`, dove `inject()` non
+// ha contesto e restituirebbe `undefined` (il redirect post-logout andrebbe in
+// errore). L'import circolare store <-> router è innocuo perché il riferimento
+// viene risolto solo a runtime, dentro `logout()`.
+import router from '@/router';
 
 /**
  * Ruoli riconosciuti dal backend (`user_auth.role`).
@@ -49,7 +54,6 @@ export const useAuthStore = defineStore('auth', () => {
     const token = ref<string | null>(null);
     /** Evita di rileggere lo storage a ogni navigazione (vedi checkAuthStatus). */
     const sessionChecked = ref(false);
-    const router = useRouter();
 
     const isAuthenticated = computed(() => !!token.value && !!user.value);
     const username = computed(() => user.value?.username);

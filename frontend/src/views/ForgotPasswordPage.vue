@@ -49,33 +49,27 @@
       </div>
 
       <ion-loading :is-open="isLoading" message="Sending reset link..." />
-      <ion-toast
-          :is-open="toast.open"
-          :message="toast.message"
-          :color="toast.color"
-          :duration="2500"
-          @didDismiss="toast.open = false"
-      />
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonContent, IonList, IonItem, IonInput, IonIcon,
-  IonButton, IonGrid, IonRow, IonCol, IonLoading, IonToast
+  IonButton, IonGrid, IonRow, IonCol, IonLoading
 } from '@ionic/vue';
 import { mailOutline, keyOutline } from 'ionicons/icons';
 import { api } from '@/composables/useApi';
+import { useToast } from '@/composables/useToast';
 
 /* ---------- state ---------- */
 const router = useRouter();
 const isLoading = ref(false);
 const email = ref('');
 
-const toast = reactive({ open: false, message: '', color: 'danger' as 'success' | 'danger' });
+const { showToast } = useToast();
 
 /* ---------- computed ---------- */
 const isValidEmail = (e: string) =>
@@ -85,11 +79,6 @@ const errorClass = (f: string) => ({
   'ion-invalid': f === 'email' && email.value && !isValidEmail(email.value)
 });
 
-const showToast = (msg: string, col: 'success' | 'danger') => {
-  toast.message = msg;
-  toast.color = col;
-  toast.open = true;
-};
 
 /* ---------- password reset ---------- */
 async function handleSendResetLink() {

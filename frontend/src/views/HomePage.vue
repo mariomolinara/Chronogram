@@ -103,7 +103,6 @@
         </div>
       </div>
       <ion-loading :is-open="isLoading" message="Loading activities..." />
-      <ion-toast :is-open="toast.open" :message="toast.message" :color="toast.color" :duration="2500" @didDismiss="toast.open=false" />
     </ion-content>
     <ion-alert
         :is-open="showDeleteConfirm"
@@ -121,7 +120,7 @@ import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonButtons, IonContent, IonIcon, IonButton,
   IonCard, IonCardContent, IonFabButton,
-  IonLoading, IonToast, IonText, IonAlert, alertController
+  IonLoading, IonText, IonAlert, alertController
 } from '@ionic/vue';
 import {
   homeOutline, settingsOutline, personCircleOutline, addOutline, trashBinOutline,
@@ -129,6 +128,7 @@ import {
 } from 'ionicons/icons';
 import dayjs from 'dayjs';
 import { api } from '@/composables/useApi';
+import { useToast } from '@/composables/useToast';
 
 import { watch } from 'vue';
 import { useActivityStore } from '@/store/activityStore';
@@ -174,9 +174,9 @@ interface Activity {
 const activities = ref<Activity[]>([]);
 const isLoading = ref(false);
 const loadError = ref(false);
-const toast = ref({ open: false, message: '', color: 'danger' });
 
 const activityStore = useActivityStore();
+const { showToast } = useToast();
 
 /* ---------- Computed ---------- */
 const formattedCurrentDate = computed(() => {
@@ -330,12 +330,6 @@ async function confirmLogout() {
   });
   await alert.present();
 }
-
-const showToast = (msg: string, col: 'success' | 'danger') => {
-  toast.value.message = msg;
-  toast.value.color = col;
-  toast.value.open = true;
-};
 
 /* ---------- Lifecycle Hooks ---------- */
 onMounted(() => {

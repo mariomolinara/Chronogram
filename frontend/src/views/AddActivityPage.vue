@@ -200,13 +200,6 @@
       </ion-modal>
 
       <ion-loading :is-open="isLoading" message="Saving activity..." />
-      <ion-toast
-          :is-open="toast.open"
-          :message="toast.message"
-          :color="toast.color"
-          :duration="2500"
-          @didDismiss="toast.open = false"
-      />
     </ion-content>
   </ion-page>
 </template>
@@ -218,7 +211,7 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
   IonButton, IonIcon, IonItem, IonLabel, IonInput, IonTextarea, IonSelect,
   IonSelectOption, IonNote, IonFab, IonFabButton, IonModal, IonSpinner,
-  IonLoading, IonToast, IonGrid, IonRow, IonCol, IonList
+  IonLoading, IonGrid, IonRow, IonCol, IonList
 } from '@ionic/vue';
 
 import {
@@ -227,6 +220,7 @@ import {
 } from 'ionicons/icons';
 
 import { api } from '@/composables/useApi';
+import { useToast } from '@/composables/useToast';
 
 import { useRoute } from 'vue-router';
 
@@ -252,7 +246,7 @@ const activity = reactive({
   location: '' as 'home' | 'work' | 'outside' | 'other' | '',
 });
 
-const toast = reactive({ open: false, message: '', color: 'danger' as 'success' | 'danger' });
+const { showToast } = useToast();
 
 const hasErrors = computed(() =>
     !activity.name.trim() ||
@@ -282,12 +276,6 @@ const adjustPleasantness = (d: number) => {
 
 const openAIModal = () => (isModalOpen.value = true);
 const closeAIModal = () => (isModalOpen.value = false);
-
-const showToast = (msg: string, col: 'success' | 'danger') => {
-  toast.message = msg;
-  toast.color = col;
-  toast.open = true;
-};
 
 const route = useRoute();
 

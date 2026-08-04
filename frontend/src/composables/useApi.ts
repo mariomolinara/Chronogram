@@ -1,7 +1,7 @@
 // Importazione delle dipendenze necessarie
 import axios from 'axios'; // Libreria per effettuare chiamate HTTP
 import { useAuthStore } from '@/store/auth'; // Store Pinia per la gestione dell'autenticazione
-import { useRouter } from 'vue-router'; // Router di Vue per la navigazione
+import router from '@/router'; // Istanza singleton del router (vedi nota nell'interceptor)
 import { toastController } from '@ionic/vue'; // Controller per mostrare notifiche toast
 import { isPublicApiPath } from '@/constants/apiRoutes'; // Rotte pubbliche condivise
 
@@ -83,10 +83,12 @@ export function initApiInterceptors() {
 
         // Handler per errori - contiene la logica principale
         async error => {
-            // Otteniamo lo store di autenticazione e il router
-            // Nota: Questi devono essere chiamati dentro la funzione perché usano la Composition API
+            // Lo store va risolto dentro l'handler (serve una Pinia attiva), il
+            // router no: qui siamo in un callback axios, fuori da qualsiasi
+            // `setup()`, quindi `useRouter()` restituirebbe `undefined` e la
+            // gestione del 401 esploderebbe su `router.currentRoute`. Si usa
+            // l'istanza singleton importata a livello di modulo.
             const authStore = useAuthStore();
-            const router = useRouter();
 
             /**
              * Gestione specifica per errori 401 Unauthorized
