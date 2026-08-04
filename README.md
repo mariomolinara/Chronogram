@@ -2,11 +2,6 @@
   <img src="docs/Logo.png" alt="Chronogram Title" width="400"/>
 </p>
 
-
-
-
-
-
 <p align="center" style="margin-top: 40px;">
     <img src="https://img.shields.io/github/stars/bonoboprog/Chronogram?style=plastic&color=FF2E2E&labelColor=2d0052" alt="GitHub stars">         <!-- Rosso -->
     <img src="https://img.shields.io/github/contributors/bonoboprog/Chronogram?style=plastic&color=FF7F00&labelColor=2d0052" alt="GitHub contributors"> <!-- Arancione -->
