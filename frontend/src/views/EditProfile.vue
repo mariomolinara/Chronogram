@@ -31,7 +31,16 @@
         <ion-item class="glass-input">
           <ion-input label="Password" label-placement="floating" type="password" v-model="password" />
         </ion-item>
-        <ion-item class="glass-input" :class="{ 'item-has-value': !!selectedBirthday }" @click="openBirthdayModal" :detail="false" button>
+        <ion-item
+            class="glass-input"
+            :class="{ 'item-has-value': !!selectedBirthday }"
+            @click="openBirthdayModal"
+            :detail="false"
+            button
+            aria-haspopup="dialog"
+            :aria-expanded="isBirthdayOpen"
+            :aria-label="birthdayAriaLabel"
+        >
           <ion-label position="floating">Birthday</ion-label>
           <div class="custom-input-value">{{ formattedBirthday }}</div>
         </ion-item>
@@ -53,14 +62,40 @@
 
       <ion-button expand="block" class="ion-margin-top">Save Changes</ion-button>
 
-      <ion-modal ref="birthdayModal" :keep-contents-mounted="true">
+      <!--
+        Stessa correzione di RegistrationPage.vue: modale dichiarativa
+        (`:is-open`) invece di `$el.present()/dismiss()`. Con la variante
+        imperativa il primo tap veniva perso (custom element non ancora
+        idratato) e la `dismiss()` chiamata dentro `ionChange` cadeva durante
+        l'animazione di apertura, lasciando l'overlay smontato a metà
+        (`show-modal` senza `overlay-hidden`, focus bloccato sulla modale):
+        da lì in poi nessun campo della pagina era più editabile.
+      -->
+      <ion-modal
+          class="birthday-modal"
+          :is-open="isBirthdayOpen"
+          :keep-contents-mounted="true"
+          @didDismiss="isBirthdayOpen = false"
+      >
+        <!--
+          `prefer-wheel` + `show-default-buttons`: si scorre l'anno fino al 1900
+          senza uscire dalla dialog e il valore viene confermato SOLO con "Done".
+          Prima ogni cambio di mese/anno emetteva `ionChange` e chiudeva tutto.
+        -->
         <ion-datetime
             id="birthday-datetime"
             presentation="date"
-            v-model="selectedBirthday"
-            @ionChange="birthdayModal?.$el.dismiss()"
+            prefer-wheel
+            :value="pickerValue"
+            :min="MIN_BIRTHDAY"
+            :max="MAX_BIRTHDAY"
+            :show-default-buttons="true"
+            done-text="Done"
+            cancel-text="Cancel"
+            aria-label="Date of birth"
             class="ion-dark"
-            :interface-options="{ cssClass: 'catppuccin-datetime-overlay' }"
+            @ionChange="onBirthdaySelected"
+            @ionCancel="isBirthdayOpen = false"
         />
       </ion-modal>
     </ion-content>
@@ -75,6 +110,13 @@ import {
 } from '@ionic/vue';
 import { useRouter } from 'vue-router';
 import { personCircleOutline, arrowBackOutline } from 'ionicons/icons';
+import dayjs from 'dayjs';
+
+/** Intervallo ragionevole per una data di nascita: nessuna data futura. */
+const MIN_BIRTHDAY = '1900-01-01';
+const MAX_BIRTHDAY = dayjs().format('YYYY-MM-DD');
+/** Anno di partenza della ruota quando il campo è ancora vuoto. */
+const DEFAULT_BIRTHDAY = '2000-01-01';
 
 const router = useRouter();
 
@@ -84,11 +126,30 @@ const phone = ref('');
 const email = ref('');
 const password = ref('');
 const gender = ref('');
-const birthdayModal = ref<InstanceType<typeof IonModal>>();
+const isBirthdayOpen = ref(false);
+/** Valore confermato (vuoto finché l'utente non preme "Done"). */
 const selectedBirthday = ref<string>();
+/** Valore su cui è posizionata la ruota: non deve riempire il campo. */
+const pickerValue = ref<string>(DEFAULT_BIRTHDAY);
 
 const openBirthdayModal = () => {
-  birthdayModal.value?.$el.present();
+  isBirthdayOpen.value = true;
+};
+
+/**
+ * Con `show-default-buttons` `ionChange` scatta SOLO alla conferma ("Done"),
+ * quindi qui la chiusura è voluta. Il valore si legge dall'evento e non dal
+ * `v-model`: l'ordine dei due handler sullo stesso `ionChange` non è garantito.
+ */
+const onBirthdaySelected = (ev: CustomEvent<{ value?: string | string[] | null }>) => {
+  const value = ev.detail?.value;
+  const iso = Array.isArray(value) ? value[0] : value;
+
+  if (iso) {
+    pickerValue.value = iso;
+    selectedBirthday.value = iso;
+  }
+  isBirthdayOpen.value = false;
 };
 
 const formattedBirthday = computed(() => {
@@ -99,6 +160,10 @@ const formattedBirthday = computed(() => {
     year: 'numeric'
   });
 });
+
+const birthdayAriaLabel = computed(() =>
+    formattedBirthday.value ? `Birthday, ${formattedBirthday.value}` : 'Birthday, not set'
+);
 
 const goBack = () => {
   router.push({ name: 'Settings' });
@@ -122,5 +187,17 @@ ion-item.glass-input {
   padding-top: var(--space-2);
   padding-bottom: var(--space-2);
   min-height: calc(1em + 16px);
+}
+/* La modale della data si adatta al picker: prima era un pannello quasi vuoto
+   a tutta pagina con la ruota schiacciata in un angolo. */
+ion-modal.birthday-modal {
+  --width: fit-content;
+  --min-width: 290px;
+  --height: fit-content;
+  --border-radius: var(--radius-lg, 16px);
+  --box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+}
+ion-modal.birthday-modal ion-datetime {
+  height: auto;
 }
 </style>

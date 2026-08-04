@@ -78,6 +78,7 @@
                   label-placement="floating"
                   :aria-label="'Password'"
                   autocomplete="new-password"
+                  :helper-text="PASSWORD_HINT"
               />
               <ion-icon
                   slot="end"
@@ -98,6 +99,9 @@
                 @click="openBirthdayModal"
                 :detail="false"
                 button
+                aria-haspopup="dialog"
+                :aria-expanded="isBirthdayOpen"
+                :aria-label="birthdayAriaLabel"
             >
               <ion-icon slot="start" :icon="calendarOutline" class="input-icon" />
               <ion-label position="floating">Birthday</ion-label>
@@ -141,13 +145,40 @@
         </div>
       </div>
 
-      <ion-modal ref="birthdayModal" :keep-contents-mounted="true">
+      <!--
+        Modale dichiarativa (`:is-open`) e NON imperativa (`$el.present()`):
+        con la variante imperativa il primo tap veniva perso (il custom element
+        non era ancora idratato) e la `dismiss()` invocata dentro `ionChange`
+        cadeva durante l'animazione di apertura, lasciando l'overlay smontato a
+        metà (`show-modal` senza `overlay-hidden`, focus bloccato sulla modale,
+        `body { overflow: hidden }`): da lì in poi NESSUN campo del form era più
+        digitabile e il pulsante Register non si abilitava mai.
+      -->
+      <ion-modal
+          class="birthday-modal"
+          :is-open="isBirthdayOpen"
+          :keep-contents-mounted="true"
+          @didDismiss="isBirthdayOpen = false"
+      >
+        <!--
+          `prefer-wheel` + `show-default-buttons`: la ruota permette di scorrere
+          gli anni fino al 1900 senza uscire dalla dialog e il valore viene
+          confermato SOLO con "Done". Prima ogni cambio di mese/anno emetteva
+          `ionChange` e chiudeva la modale, costringendo a riaprirla a ogni passo.
+        -->
         <ion-datetime
             presentation="date"
-            v-model="dateIso"
-            @ionChange="onBirthdaySelected"
+            prefer-wheel
+            :value="dateIso"
+            :min="MIN_BIRTHDAY"
+            :max="MAX_BIRTHDAY"
+            :show-default-buttons="true"
+            done-text="Done"
+            cancel-text="Cancel"
+            aria-label="Date of birth"
             class="ion-dark"
-            :interface-options="{ cssClass: 'catppuccin-datetime-overlay' }"
+            @ionChange="onBirthdaySelected"
+            @ionCancel="isBirthdayOpen = false"
         />
       </ion-modal>
       <ion-loading :is-open="isLoading" message="Registering..." />
@@ -173,12 +204,23 @@ import dayjs from 'dayjs';
 import { api } from '@/composables/useApi';
 import { useToast } from '@/composables/useToast';
 
+/* ---------- costanti ---------- */
+/** Regola applicata da `isStrongPassword`: senza indicarla il pulsante Register
+ *  resta disabilitato e l'utente non ha modo di capire quale campo manca. */
+const PASSWORD_HINT = 'At least 8 characters, with upper and lower case, a digit and a symbol.';
+
+/** Intervallo ragionevole per una data di nascita: nessuna data futura. */
+const MIN_BIRTHDAY = '1900-01-01';
+const MAX_BIRTHDAY = dayjs().format('YYYY-MM-DD');
+/** Anno di partenza della ruota quando il campo è ancora vuoto. */
+const DEFAULT_BIRTHDAY = '2000-01-01';
+
 /* ---------- state ---------- */
-const router        = useRouter();
-const birthdayModal = ref<InstanceType<typeof IonModal>>();
-const isLoading     = ref(false);
-const showPassword  = ref(false);
-const dateIso       = ref<string>();
+const router         = useRouter();
+const isBirthdayOpen = ref(false);
+const isLoading      = ref(false);
+const showPassword   = ref(false);
+const dateIso        = ref<string>(DEFAULT_BIRTHDAY);
 
 const form = reactive({
   name: '', surname: '', address: '', phone: '',
@@ -189,6 +231,9 @@ const { showToast } = useToast();
 
 /* ---------- computed ---------- */
 const formattedBirthday = computed(() => form.birthday);
+const birthdayAriaLabel = computed(() =>
+    form.birthday ? `Birthday, ${form.birthday}` : 'Birthday, not set'
+);
 const hasErrors = computed(() =>
     !form.name.trim()       ||
     !form.surname.trim()    ||
@@ -211,13 +256,24 @@ const errorClass = (f: keyof typeof form) => ({
       (!(form[f] as string).trim() && ['name', 'surname', 'address'].includes(f))
 });
 
-const openBirthdayModal = () => birthdayModal.value?.$el.present();
+const openBirthdayModal = () => {
+  isBirthdayOpen.value = true;
+};
 
-const onBirthdaySelected = () => {
-  if (dateIso.value) {
-    form.birthday = dayjs(dateIso.value).format('DD-MM-YYYY');
+/**
+ * Con `show-default-buttons` `ionChange` scatta SOLO alla conferma ("Done"),
+ * quindi qui la chiusura è voluta. Il valore si legge dall'evento e non dal
+ * `v-model`: l'ordine dei due handler sullo stesso `ionChange` non è garantito.
+ */
+const onBirthdaySelected = (ev: CustomEvent<{ value?: string | string[] | null }>) => {
+  const value = ev.detail?.value;
+  const iso = Array.isArray(value) ? value[0] : value;
+
+  if (iso) {
+    dateIso.value = iso;
+    form.birthday = dayjs(iso).format('DD-MM-YYYY');
   }
-  birthdayModal.value?.$el.dismiss();
+  isBirthdayOpen.value = false;
 };
 
 /* ---------- registration ---------- */
@@ -230,7 +286,6 @@ async function handleRegister() {
   isLoading.value = true;
   try {
     const { data } = await api.post('/api/auth/register', { ...form });
-    console.log('Register API response data:', data);  // <-- ADD THIS
     if (!data?.success) throw new Error(data?.message ?? 'Unknown error');
 
     showToast(data.message || 'Registered successfully!', 'success');
@@ -304,5 +359,17 @@ ion-icon.toggle-eye {
 }
 ion-select::part(icon) {
   color: var(--peach);
+}
+/* La modale della data si adatta al picker: prima era un pannello quasi vuoto
+   a tutta pagina con la ruota schiacciata in un angolo. */
+ion-modal.birthday-modal {
+  --width: fit-content;
+  --min-width: 290px;
+  --height: fit-content;
+  --border-radius: var(--radius-lg, 16px);
+  --box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+}
+ion-modal.birthday-modal ion-datetime {
+  height: auto;
 }
 </style>
