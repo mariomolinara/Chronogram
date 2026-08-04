@@ -1,0 +1,63 @@
+# Production stack for devaidalab.unicas.it — everything in containers.
+#
+#   host nginx (443, existing cert) ── /chronogram/ ──> 127.0.0.1:8800
+#        └─> tomcat container (10.1, WAR from ./webapps) ──> mysql container
+#
+# Install location on the server: /opt/chronogram/
+#   ├── docker-compose.prod.yml   (this file)
+#   ├── chronogram.env            (from chronogram.env.example — secrets, chmod 600)
+#   └── webapps/                  (chronogram.war placed here by the deploy script)
+#
+# Start:  docker compose -f docker-compose.prod.yml up -d
+#
+# MySQL data lives in the named volume `mysql-data`: it survives every deploy,
+# restart and image update. The deploy pipeline only replaces the WAR — schema
+# changes happen exclusively via Flyway migrations at application startup.
+# NEVER run `docker compose down -v` in production: `-v` deletes the volume.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: chronogram-mysql
+    restart: unless-stopped
+    # MYSQL_ROOT_PASSWORD / MYSQL_DATABASE / MYSQL_USER / MYSQL_PASSWORD come
+    # from chronogram.env; the same MYSQL_* values are read by the app as
+    # fallbacks for its DB settings, so credentials are defined only once.
+    env_file:
+      - chronogram.env
+    # No `ports:` — the DB is reachable only from the tomcat container.
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # $$ escapes to a literal $: the password is expanded inside the container.
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  tomcat:
+    image: tomcat:10.1-jre21-temurin
+    container_name: chronogram-tomcat
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - chronogram.env
+    environment:
+      # DB host/port on the compose network; everything else (credentials,
+      # JWT, CORS, mail, LLM…) comes from chronogram.env.
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      SPRING_PROFILES_ACTIVE: prod
+    # Tomcat listens on 8080 inside the container; only localhost:8800 is
+    # exposed on the host — nginx is the sole public entrypoint.
+    ports:
+      - "127.0.0.1:8800:8080"
+    volumes:
+      # chronogram.war → context path /chronogram. Tomcat unpacks it here on
+      # start; the deploy script swaps the file and restarts this container.
+      - ./webapps:/usr/local/tomcat/webapps
+
+volumes:
+  mysql-data:

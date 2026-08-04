@@ -1,12 +1,14 @@
-# Continuous deployment to devaidalab.unicas.it (Tomcat, port 8800).
+# Continuous deployment to devaidalab.unicas.it (Docker stack, Tomcat on 8800).
 #
 # Trigger : every push to `main` (or manual run from the Actions tab).
 # Build   : frontend (Vite, base /chronogram/) baked into the Spring Boot WAR.
 # Deploy  : WAR copied via SSH, then the server-side script
-#           /usr/local/bin/chronogram-deploy.sh swaps it into Tomcat's webapps
-#           and waits for the health check. The database is NEVER touched by
-#           this pipeline: schema changes run only as Flyway versioned
-#           migrations at application startup (ddl-auto=validate).
+#           /usr/local/bin/chronogram-deploy.sh swaps it into
+#           /opt/chronogram/webapps and restarts the tomcat container
+#           (docker-compose.prod.yml), waiting for the health check. The mysql
+#           container and its data volume are NEVER touched by this pipeline:
+#           schema changes run only as Flyway versioned migrations at
+#           application startup (ddl-auto=validate).
 #
 # Required repository secrets (Settings > Secrets and variables > Actions):
 #   DEPLOY_HOST      devaidalab.unicas.it
@@ -101,7 +103,8 @@ jobs:
           PORT="${PORT:-22}"
           scp -P "$PORT" -i ~/.ssh/deploy_key chronogram.war "$USER@$HOST:/tmp/chronogram-${GITHUB_SHA::12}.war"
           # The script (root-owned, allowed via a NOPASSWD sudoers entry) stops
-          # Tomcat, replaces webapps/chronogram.war, restarts and polls
+          # the tomcat container, replaces /opt/chronogram/webapps/chronogram.war,
+          # restarts the stack and polls
           # http://127.0.0.1:8800/chronogram/actuator/health until UP.
           ssh -p "$PORT" -i ~/.ssh/deploy_key "$USER@$HOST" \
             "sudo /usr/local/bin/chronogram-deploy.sh /tmp/chronogram-${GITHUB_SHA::12}.war"
