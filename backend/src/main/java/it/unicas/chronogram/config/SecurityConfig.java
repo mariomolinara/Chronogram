@@ -58,6 +58,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/activities/**").authenticated()
                         // Back-office: aggregate stats and full-database export.
                         .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
+                        // Catch-all for any future /api endpoint added without an
+                        // explicit rule: never let it fall through to the public
+                        // static-resources matcher below.
+                        .requestMatchers("/api/**", "/actuator/**").authenticated()
+                        // The SPA bundle (index.html, /assets/**, icons) and its
+                        // client-side routes are public by nature; everything
+                        // sensitive lives under /api and is matched above.
+                        .requestMatchers(HttpMethod.GET, "/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
