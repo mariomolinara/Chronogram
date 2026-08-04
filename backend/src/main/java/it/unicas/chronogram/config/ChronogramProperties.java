@@ -54,7 +54,15 @@ public class ChronogramProperties {
     @Getter
     @Setter
     public static class Reset {
-        private String fallbackBaseUrl = "http://localhost:8100";
+        /**
+         * Canonical base URL of the front-end, used to build EVERY password-reset
+         * link. The request {@code Origin} header is deliberately ignored: it is
+         * the bare origin (no context path) for the web app and the WebView origin
+         * for the Android app, so it would produce broken links. Bound from the
+         * {@code APP_CANONICAL_URL} environment variable; a trailing slash is
+         * tolerated and stripped when the link is built.
+         */
+        private String appBaseUrl = "http://localhost:5173";
         private int tokenTtlMinutes = 30;
         /**
          * Minimum interval, in seconds, between two accepted password-reset

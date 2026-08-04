@@ -26,9 +26,10 @@ chronogram:
       # "*", and required — no localhost default in production.
       allowed-origins: ${CORS_ALLOWED_ORIGINS}
   reset:
-    # Canonical HTTPS URL of the front-end, used to build reset links when the
-    # Origin header is absent.
-    fallback-base-url: ${APP_CANONICAL_URL}
+    # Canonical HTTPS URL of the front-end (including the context path when the
+    # SPA is served from the WAR, e.g. https://host/chronogram). Always used to
+    # build password-reset links; required — no default in production.
+    app-base-url: ${APP_CANONICAL_URL}
 
 # Actuator: only liveness/readiness health and info, over the normal port (behind
 # nginx). Health details are hidden from anonymous callers; nothing else exposed.

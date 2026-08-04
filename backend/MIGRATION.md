@@ -94,7 +94,9 @@ absolute URLs come out as `https://…`.
   - `JWT_SECRET_KEY` — strong, ≥ 32 bytes: `openssl rand -base64 48`
   - `CORS_ALLOWED_ORIGINS` — the real front-end origin(s), e.g.
     `https://app.example.com` (comma-separated, **never** `*`)
-  - `APP_CANONICAL_URL` — the public HTTPS URL, e.g. `https://app.example.com`
+  - `APP_CANONICAL_URL` — the public HTTPS URL of the front-end, used to build
+    every password-reset link (include the context path when the SPA is served
+    under one), e.g. `https://app.example.com`
   - `SPRING_PROFILES_ACTIVE=prod` (already the compose default)
   - DB / LLM / mail secrets as usual
 

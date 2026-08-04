@@ -33,9 +33,10 @@ public class AuthController {
     }
 
     @PostMapping("/request-reset")
-    public ApiResponse<Void> requestReset(@Valid @RequestBody ForgotPasswordRequest request,
-                                          @RequestHeader(value = "Origin", required = false) String origin) {
-        passwordResetService.initiatePasswordReset(request.email(), origin);
+    public ApiResponse<Void> requestReset(@Valid @RequestBody ForgotPasswordRequest request) {
+        // The reset link is built server-side from the configured canonical URL,
+        // never from the caller's Origin header (see PasswordResetService).
+        passwordResetService.initiatePasswordReset(request.email());
         // Always return the same message so the existence of an account is not revealed.
         return ApiResponse.ok("If your email address exists in our system, you will receive a password reset link.");
     }

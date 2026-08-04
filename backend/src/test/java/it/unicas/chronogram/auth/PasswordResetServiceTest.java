@@ -37,15 +37,20 @@ class PasswordResetServiceTest {
     @Mock private EmailService emailService;
     @Mock private PasswordEncoder passwordEncoder;
 
+    private ChronogramProperties props;
     private PasswordResetService service;
 
     @BeforeEach
     void setUp() {
-        ChronogramProperties props = new ChronogramProperties();
+        props = new ChronogramProperties();
         props.getReset().setTokenTtlMinutes(30);
-        props.getReset().setFallbackBaseUrl("http://fallback.local");
+        props.getReset().setAppBaseUrl("https://app.local/chronogram");
         props.getReset().setRequestCooldownSeconds(60);
-        service = new PasswordResetService(
+        service = newService();
+    }
+
+    private PasswordResetService newService() {
+        return new PasswordResetService(
                 userAuthRepository, tokenRepository, emailService, passwordEncoder, props);
     }
 
@@ -60,13 +65,13 @@ class PasswordResetServiceTest {
     // ---- initiatePasswordReset ----
 
     @Test
-    void initiateCreatesTokenAndSendsEmailUsingOrigin() {
+    void initiateCreatesTokenAndSendsEmailUsingConfiguredBaseUrl() {
         UserAuth user = activeUser();
         when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
         when(tokenRepository.findByUserId(11)).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("verifier-hash");
 
-        service.initiatePasswordReset("ada@example.com", "http://origin.local");
+        service.initiatePasswordReset("ada@example.com");
 
         ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
         verify(tokenRepository).save(tokenCaptor.capture());
@@ -78,21 +83,40 @@ class PasswordResetServiceTest {
 
         ArgumentCaptor<String> fullTokenCaptor = ArgumentCaptor.forClass(String.class);
         verify(emailService).sendPasswordResetEmail(
-                eq("ada@example.com"), fullTokenCaptor.capture(), eq("http://origin.local"));
+                eq("ada@example.com"), fullTokenCaptor.capture(), eq("https://app.local/chronogram"));
         // full token is selector:verifier
         assertThat(fullTokenCaptor.getValue()).contains(":").startsWith(token.getSelector() + ":");
     }
 
     @Test
-    void initiateUsesFallbackBaseUrlWhenOriginBlank() {
+    void initiateStripsTrailingSlashFromConfiguredBaseUrl() {
+        props.getReset().setAppBaseUrl("https://app.local/chronogram/");
+        service = newService();
         UserAuth user = activeUser();
         when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
         when(tokenRepository.findByUserId(11)).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("verifier-hash");
 
-        service.initiatePasswordReset("ada@example.com", "  ");
+        service.initiatePasswordReset("ada@example.com");
 
-        verify(emailService).sendPasswordResetEmail(anyString(), anyString(), eq("http://fallback.local"));
+        // The link must be <base>/reset-password, never <base>//reset-password.
+        verify(emailService).sendPasswordResetEmail(
+                anyString(), anyString(), eq("https://app.local/chronogram"));
+    }
+
+    @Test
+    void initiateFailsWhenBaseUrlIsNotConfigured() {
+        props.getReset().setAppBaseUrl("   ");
+        service = newService();
+        UserAuth user = activeUser();
+        when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.findByUserId(11)).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString())).thenReturn("verifier-hash");
+
+        assertThatThrownBy(() -> service.initiatePasswordReset("ada@example.com"))
+                .isInstanceOf(ServiceException.class)
+                .hasMessageContaining("app-base-url");
+        verifyNoInteractions(emailService);
     }
 
     @Test
@@ -104,7 +128,7 @@ class PasswordResetServiceTest {
         when(tokenRepository.findByUserId(11)).thenReturn(Optional.of(existing));
         when(passwordEncoder.encode(anyString())).thenReturn("verifier-hash");
 
-        service.initiatePasswordReset("ada@example.com", "http://origin.local");
+        service.initiatePasswordReset("ada@example.com");
 
         ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
         verify(tokenRepository).save(tokenCaptor.capture());
@@ -122,7 +146,7 @@ class PasswordResetServiceTest {
         when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
         when(tokenRepository.findByUserId(11)).thenReturn(Optional.of(recent));
 
-        service.initiatePasswordReset("ada@example.com", "http://origin.local");
+        service.initiatePasswordReset("ada@example.com");
 
         // No new token persisted, no new email sent.
         verify(tokenRepository, never()).save(any());
@@ -141,20 +165,21 @@ class PasswordResetServiceTest {
         when(tokenRepository.findByUserId(11)).thenReturn(Optional.of(stale));
         when(passwordEncoder.encode(anyString())).thenReturn("verifier-hash");
 
-        service.initiatePasswordReset("ada@example.com", "http://origin.local");
+        service.initiatePasswordReset("ada@example.com");
 
         ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
         verify(tokenRepository).save(tokenCaptor.capture());
         assertThat(tokenCaptor.getValue().getTokenId()).isEqualTo(99); // same row, refreshed
         assertThat(tokenCaptor.getValue().getCreatedAt()).isAfter(LocalDateTime.now().minusSeconds(5));
-        verify(emailService).sendPasswordResetEmail(eq("ada@example.com"), anyString(), eq("http://origin.local"));
+        verify(emailService).sendPasswordResetEmail(
+                eq("ada@example.com"), anyString(), eq("https://app.local/chronogram"));
     }
 
     @Test
     void initiateSilentlyDoesNothingForUnknownEmail() {
         when(userAuthRepository.findByEmailIgnoreCase("ghost@example.com")).thenReturn(Optional.empty());
 
-        service.initiatePasswordReset("ghost@example.com", "http://origin.local");
+        service.initiatePasswordReset("ghost@example.com");
 
         verify(tokenRepository, never()).save(any());
         verifyNoInteractions(emailService);
@@ -166,7 +191,7 @@ class PasswordResetServiceTest {
         user.setActive(false);
         when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
 
-        service.initiatePasswordReset("ada@example.com", "http://origin.local");
+        service.initiatePasswordReset("ada@example.com");
 
         verify(tokenRepository, never()).save(any());
         verifyNoInteractions(emailService);

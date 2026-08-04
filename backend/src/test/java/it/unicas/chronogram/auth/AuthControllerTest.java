@@ -135,16 +135,18 @@ class AuthControllerTest {
 
     @Test
     void requestResetAlwaysReturnsGenericOkMessage() throws Exception {
-        doNothing().when(passwordResetService).initiatePasswordReset(anyString(), any());
+        doNothing().when(passwordResetService).initiatePasswordReset(anyString());
         Map<String, Object> body = Map.of("email", "ada@example.com");
 
+        // The Origin header must be ignored: the reset link is built server-side
+        // from the configured canonical URL.
         mockMvc.perform(post("/api/auth/request-reset").with(csrf())
-                        .header("Origin", "http://localhost:8100")
+                        .header("Origin", "https://localhost")
                         .contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
-        verify(passwordResetService).initiatePasswordReset("ada@example.com", "http://localhost:8100");
+        verify(passwordResetService).initiatePasswordReset("ada@example.com");
     }
 
     @Test

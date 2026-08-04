@@ -83,7 +83,7 @@ Key variables in `.env`:
 | `MYSQL_USER`, `MYSQL_DATABASE` | Database user / schema name |
 | `JWT_SECRET_KEY` | HMAC key for JWTs — **must be ≥ 32 chars** (`openssl rand -base64 48`) |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated allowlist of front-end origins (never `*`) |
-| `APP_CANONICAL_URL` | Public base URL used in password-reset links |
+| `APP_CANONICAL_URL` | Canonical front-end base URL used in **all** password-reset links (include the context path, e.g. `https://host/chronogram`) |
 | `LLM_API_URL`, `LLM_DEFAULT_MODEL`, `LLM_API_KEY` | LLM provider (default regolo.ai; key from https://dashboard.regolo.ai) |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` | SMTP settings (Gmail: use an App Password) |
 | `ADMIN_EMAIL`, `ADMIN_INITIAL_PASSWORD` | Built-in administrator, created on first boot (see [Admin area](#️-admin-area)) |

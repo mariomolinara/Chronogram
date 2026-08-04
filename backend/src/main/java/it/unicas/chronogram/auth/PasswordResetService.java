@@ -48,8 +48,17 @@ public class PasswordResetService {
         this.resetProps = properties.getReset();
     }
 
+    /**
+     * Issues a reset token for the given address and emails the reset link.
+     * The link is always built from {@code chronogram.reset.app-base-url}
+     * ({@code APP_CANONICAL_URL}): the request {@code Origin} header is not used,
+     * because browsers send the bare origin without the context path and the
+     * Android WebView sends its own local origin, both of which yield dead links.
+     *
+     * @param email address entered in the "forgot password" form
+     */
     @Transactional
-    public void initiatePasswordReset(String email, String origin) {
+    public void initiatePasswordReset(String email) {
         UserAuth user = userAuthRepository.findByEmailIgnoreCase(email).orElse(null);
         if (user == null || !user.isActive()) {
             // Do not reveal whether the email exists.
@@ -85,8 +94,7 @@ public class PasswordResetService {
         tokenRepository.save(token);
 
         String fullToken = selector + ":" + verifier;
-        String baseUrl = StringUtils.hasText(origin) ? origin : resetProps.getFallbackBaseUrl();
-        emailService.sendPasswordResetEmail(email, fullToken, baseUrl);
+        emailService.sendPasswordResetEmail(email, fullToken, appBaseUrl());
 
         log.info("Reset token created and email sent for {}", email);
     }
@@ -118,6 +126,22 @@ public class PasswordResetService {
 
         tokenRepository.deleteBySelector(selector);
         log.info("Password successfully reset for user_id={}", resetToken.getUserId());
+    }
+
+    /**
+     * Configured front-end base URL, without any trailing slash so the caller can
+     * safely append an absolute path ({@code base + "/reset-password"}).
+     */
+    private String appBaseUrl() {
+        String baseUrl = resetProps.getAppBaseUrl();
+        if (!StringUtils.hasText(baseUrl)) {
+            throw new ServiceException("chronogram.reset.app-base-url (APP_CANONICAL_URL) is not configured.");
+        }
+        baseUrl = baseUrl.trim();
+        while (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        return baseUrl;
     }
 
     private String generateSecureString(int length) {

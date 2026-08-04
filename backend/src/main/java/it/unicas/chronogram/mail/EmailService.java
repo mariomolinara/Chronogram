@@ -33,7 +33,8 @@ public class EmailService {
      *
      * @param toEmail recipient address
      * @param token   full {@code selector:verifier} token
-     * @param baseUrl base URL used to build the reset link
+     * @param baseUrl canonical front-end base URL, without a trailing slash
+     *                (normalised by the caller, see PasswordResetService)
      */
     public void sendPasswordResetEmail(String toEmail, String token, String baseUrl) {
         String resetUrl = baseUrl + "/reset-password?token=" + token;
