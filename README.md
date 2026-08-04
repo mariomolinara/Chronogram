@@ -176,10 +176,10 @@ docker exec -it chronogram-mysql mysql -u chronouser -p chronogram
 
 ## 👥 Contributors
 
-| Name             | Role                             | GitHub                                             |
-| ---------------- | -------------------------------- | -------------------------------------------------- |
-| Mario Molinara   | Sviluppatore e coordinatore      | [@mariomolinara](https://github.com/mariomolinara) |
-| Giuseppe Alfieri | Progettista e sviluppatore       | [@giusalfieri](https://github.com/giusalfieri)     |
-| Paolo Simeone    | Progettista e sviluppatore       | [@bonoboprog](https://github.com/bonoboprog)       |
-| Sergio Nisticò   | Committente                      | —                                                  |
-| Violeta Perez    | Sviluppatore prototipo iniziale  | [@violetapd](https://github.com/violetapd)         |
+| Name                 | Role                             | GitHub                                             |
+| -------------------- | -------------------------------- | -------------------------------------------------- |
+| Prof. Sergio Nisticò | Committente                      | —                                                  |
+| Prof. Mario Molinara | Sviluppatore e coordinatore      | [@mariomolinara](https://github.com/mariomolinara) |
+| Giuseppe Alfieri     | Progettista e sviluppatore       | [@giusalfieri](https://github.com/giusalfieri)     |
+| Paolo Simeone        | Progettista e sviluppatore       | [@bonoboprog](https://github.com/bonoboprog)       |
+| Violeta Perez        | Sviluppatore prototipo iniziale  | [@violetapd](https://github.com/violetapd)         |
