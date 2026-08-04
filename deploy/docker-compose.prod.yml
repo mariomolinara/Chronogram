@@ -17,7 +17,11 @@
 
 services:
   mysql:
-    image: mysql:8.0
+    # Pinned to 8.0.32: newer 8.0.x images are built on Oracle Linux 9, whose
+    # glibc requires x86-64-v2 — the devaidalab CPU doesn't support it
+    # ("Fatal glibc error" at startup). The DB is not exposed outside the
+    # compose network, so staying on this version is an accepted trade-off.
+    image: mysql:8.0.32
     container_name: chronogram-mysql
     restart: unless-stopped
     # MYSQL_ROOT_PASSWORD / MYSQL_DATABASE / MYSQL_USER / MYSQL_PASSWORD come

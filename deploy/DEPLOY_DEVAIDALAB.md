@@ -10,7 +10,7 @@ Internet ──HTTPS 443──> nginx di macchina (esistente, con certificato)
                    ┌─ Docker (/opt/chronogram) ───────────────────────────┐
                    │  tomcat  (tomcat:10.1-jre21, 8080→127.0.0.1:8800)    │
                    │    └── webapps/chronogram.war (backend + SPA)        │
-                   │  mysql   (mysql:8.0, volume mysql-data — MAI toccato)│
+                   │  mysql   (mysql:8.0.32, volume mysql-data — MAI toccato)│
                    └──────────────────────────────────────────────────────┘
 ```
 
