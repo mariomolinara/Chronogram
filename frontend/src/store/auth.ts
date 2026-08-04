@@ -55,6 +55,22 @@ export const useAuthStore = defineStore('auth', () => {
     const username = computed(() => user.value?.username);
 
     /**
+     * Etichetta da mostrare nella UI. Il backend non conserva un nome proprio:
+     * `LoginResponse.username` è l'email dell'account, quindi si usa la parte
+     * locale dell'indirizzo, che è il dato più presentabile disponibile senza
+     * introdurre endpoint nuovi. Stringa vuota se non c'è sessione: la vista
+     * decide il proprio segnaposto.
+     */
+    const displayName = computed(() => {
+        const name = user.value?.username?.trim();
+        if (!name) {
+            return '';
+        }
+        const atIndex = name.indexOf('@');
+        return atIndex > 0 ? name.slice(0, atIndex) : name;
+    });
+
+    /**
      * Solo per decidere cosa mostrare nella UI. L'autorizzazione reale è del
      * backend, che rilegge il ruolo dal database a ogni richiesta: nascondere il
      * link non protegge nulla, protegge `hasRole('ADMIN')` su `/api/admin/**`.
@@ -166,6 +182,7 @@ export const useAuthStore = defineStore('auth', () => {
         token,
         isAuthenticated,
         username,
+        displayName,
         isAdmin,
         mustChangePassword,
         getToken,

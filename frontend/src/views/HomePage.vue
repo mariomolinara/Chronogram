@@ -1,11 +1,21 @@
 <template>
   <ion-page>
-    <ion-header></ion-header>
+    <!-- Toolbar trasparente: serve solo ad ancorare il logout in alto a destra
+         senza introdurre una barra opaca sopra `.user-info`. -->
+    <ion-header class="home-header">
+      <ion-toolbar class="home-toolbar">
+        <ion-buttons slot="end">
+          <ion-button class="tap-target logout-btn" aria-label="Sign out" @click="confirmLogout">
+            <ion-icon :icon="logOutOutline" color="danger" aria-hidden="true" />
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
 
     <ion-content class="ion-padding">
       <div class="user-info gradient-text">
-        <ion-icon :icon="personCircleOutline" class="user-icon" />
-        <h2>User name</h2>
+        <ion-icon :icon="personCircleOutline" class="user-icon" aria-hidden="true" />
+        <h2>{{ displayName }}</h2>
       </div>
 
       <div class="time-diary-page">
@@ -109,22 +119,24 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  IonPage, IonHeader, IonContent, IonIcon, IonButton,
+  IonPage, IonHeader, IonToolbar, IonButtons, IonContent, IonIcon, IonButton,
   IonCard, IonCardContent, IonFabButton,
-  IonLoading, IonToast, IonText, IonAlert
+  IonLoading, IonToast, IonText, IonAlert, alertController
 } from '@ionic/vue';
 import {
   homeOutline, settingsOutline, personCircleOutline, addOutline, trashBinOutline,
-  alertCircleOutline, calendarClearOutline
+  alertCircleOutline, calendarClearOutline, logOutOutline
 } from 'ionicons/icons';
 import dayjs from 'dayjs';
 import { api } from '@/composables/useApi';
 
 import { watch } from 'vue';
 import { useActivityStore } from '@/store/activityStore';
+import { useAuthStore } from '@/store/auth';
 
 /* ---------- State ---------- */
 const router = useRouter();
+const auth = useAuthStore();
 const showDeleteConfirm = ref(false);
 const pendingDeleteId = ref<number | null>(null);
 const deleteTime = ref('');
@@ -170,6 +182,13 @@ const activityStore = useActivityStore();
 const formattedCurrentDate = computed(() => {
   return currentDate.value.format('MMMM D, YYYY');
 });
+
+/**
+ * Identificativo dell'utente autenticato. Lo store espone già la forma
+ * presentabile; qui resta solo il fallback per la sessione non ancora
+ * ripristinata (mai il vecchio placeholder "User name").
+ */
+const displayName = computed(() => auth.displayName || '—');
 
 /* ---------- Methods ---------- */
 const navigateTab = (event: { detail: { value: string } }) => {
@@ -271,14 +290,11 @@ async function fetchActivities() {
   loadError.value = false;
   activities.value = [];
 
-  const userId = 1; // ← Temporary hardcoded user ID
+  // Nessun userId nel payload: il backend risolve l'utente dal principal JWT.
   const activityDate = currentDate.value.format('YYYY-MM-DD');
 
   try {
-    const { data } = await api.post('/api/activities/list', {
-      userId,
-      activityDate
-    });
+    const { data } = await api.post('/api/activities/list', { activityDate });
 
     if (!data?.success) {
       throw new Error(data?.message || 'Failed to fetch activities');
@@ -299,6 +315,22 @@ function addActivity() {
   router.push({ name: 'AddActivity' });
 }
 
+/**
+ * Stesso meccanismo (e stesso wording) della dashboard admin: conferma via
+ * `alertController` e poi `logout()` dello store, che ripulisce la sessione
+ * persistita e riporta al login.
+ */
+async function confirmLogout() {
+  const alert = await alertController.create({
+    header: 'Sign out?',
+    buttons: [
+      { text: 'Cancel', role: 'cancel' },
+      { text: 'Sign out', role: 'destructive', handler: () => auth.logout() }
+    ]
+  });
+  await alert.present();
+}
+
 const showToast = (msg: string, col: 'success' | 'danger') => {
   toast.value.message = msg;
   toast.value.color = col;
@@ -313,6 +345,31 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Header: solo il logout, su fondo trasparente e senza bordo, così la Home
+   mantiene l'aspetto immersivo che aveva con l'header vuoto. */
+.home-header {
+  box-shadow: none;
+}
+.home-header::after {
+  /* Ionic (modalità md) disegna qui la linea di separazione dell'header. */
+  display: none;
+}
+.home-toolbar {
+  --background: transparent;
+  --border-width: 0;
+  --min-height: 48px;
+  --padding-end: var(--space-2);
+}
+.logout-btn {
+  --padding-start: var(--space-2);
+  --padding-end: var(--space-2);
+  --color: var(--red);
+  --border-radius: 50%;
+}
+.logout-btn ion-icon {
+  font-size: var(--font-lg);
+}
+
 /* User Info */
 .user-info {
   display: flex;

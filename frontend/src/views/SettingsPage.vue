@@ -147,7 +147,7 @@ const confirmLogout = async () => {
     message: 'Do you want to log out and leave the app?',
     buttons: [
       { text: 'Cancel', role: 'cancel' },
-      { text: 'Yes, log out', handler: () => router.push({ name: 'Login' }) }
+      { text: 'Yes, log out', role: 'destructive', handler: () => auth.logout() }
     ]
   });
   await alert.present();
