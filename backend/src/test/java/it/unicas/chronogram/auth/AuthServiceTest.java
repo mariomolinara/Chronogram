@@ -3,8 +3,10 @@ package it.unicas.chronogram.auth;
 import it.unicas.chronogram.auth.dto.LoginResponse;
 import it.unicas.chronogram.auth.dto.RegisterRequest;
 import it.unicas.chronogram.common.exception.ApiExceptions.EmailAlreadyExistsException;
+import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.domain.UserProfile;
+import it.unicas.chronogram.repository.LoginEventRepository;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import it.unicas.chronogram.repository.UserProfileRepository;
 import it.unicas.chronogram.security.JwtService;
@@ -34,6 +36,7 @@ class AuthServiceTest {
 
     @Mock private UserAuthRepository userAuthRepository;
     @Mock private UserProfileRepository userProfileRepository;
+    @Mock private LoginEventRepository loginEventRepository;
     @Mock private JwtService jwtService;
 
     @Mock(lenient = true) // password encoder is not touched in every path
@@ -121,7 +124,7 @@ class AuthServiceTest {
         user.setFailedLoginAttempts(3);
         when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password123", "stored-hash")).thenReturn(true);
-        when(jwtService.generateToken("ada@example.com")).thenReturn("jwt-token");
+        when(jwtService.generateToken("ada@example.com", Role.USER)).thenReturn("jwt-token");
 
         LoginResponse response = authService.login("ada@example.com", "password123");
 
@@ -199,7 +202,7 @@ class AuthServiceTest {
         assertThat(user.getFailedLoginAttempts()).isEqualTo(5);
         assertThat(user.getLockedUntil()).isNotNull();
         assertThat(user.getLockedUntil()).isAfter(LocalDateTime.now());
-        verify(jwtService, never()).generateToken(anyString());
+        verify(jwtService, never()).generateToken(anyString(), any());
     }
 
     @Test
@@ -210,7 +213,7 @@ class AuthServiceTest {
 
         authService.login("ada@example.com", "wrong");
 
-        verify(jwtService, never()).generateToken(anyString());
+        verify(jwtService, never()).generateToken(anyString(), any());
         verify(userAuthRepository, times(1)).save(user);
     }
 }

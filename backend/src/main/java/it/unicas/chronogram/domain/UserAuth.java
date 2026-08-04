@@ -47,6 +47,22 @@ public class UserAuth {
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private Role role = Role.USER;
+
+    /**
+     * True for the built-in administrator provisioned from configuration. Such an
+     * account must never be deleted, deactivated or demoted: only its email and
+     * password can change.
+     */
+    @Column(name = "is_system", nullable = false)
+    private boolean systemAccount = false;
+
+    /** Set while the account still uses the password it was provisioned with. */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword = false;
+
     /** True if the account is currently within a lockout window. */
     public boolean isLocked(Instant now) {
         return lockedUntil != null

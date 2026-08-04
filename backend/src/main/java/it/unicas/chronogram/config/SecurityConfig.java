@@ -1,6 +1,8 @@
 package it.unicas.chronogram.config;
 
+import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.security.JwtAuthenticationFilter;
+import it.unicas.chronogram.security.RestAccessDeniedHandler;
 import it.unicas.chronogram.security.RestAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,9 +20,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 /**
- * Stateless security configuration: public auth/LLM endpoints, JWT-protected
- * activity endpoints, a strict CORS allowlist, and CSRF disabled (token-based,
- * no cookies).
+ * Stateless security configuration: public auth endpoints, JWT-protected
+ * activity and LLM endpoints, a strict CORS allowlist, and CSRF disabled
+ * (token-based, no cookies).
  */
 @Configuration
 public class SecurityConfig {
@@ -28,13 +30,16 @@ public class SecurityConfig {
     private final ChronogramProperties properties;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    private final RestAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(ChronogramProperties properties,
                           JwtAuthenticationFilter jwtAuthenticationFilter,
-                          RestAuthenticationEntryPoint authenticationEntryPoint) {
+                          RestAuthenticationEntryPoint authenticationEntryPoint,
+                          RestAccessDeniedHandler accessDeniedHandler) {
         this.properties = properties;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
     }
 
     @Bean
@@ -45,11 +50,18 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/**", "/api/llm/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // The LLM proxy forwards to a metered third-party provider: keep it
+                        // behind authentication so it cannot be abused by anonymous callers.
+                        .requestMatchers("/api/llm/**").authenticated()
                         .requestMatchers("/api/activities/**").authenticated()
+                        // Back-office: aggregate stats and full-database export.
+                        .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
                         .anyRequest().authenticated())
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

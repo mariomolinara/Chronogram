@@ -6,6 +6,7 @@ import it.unicas.chronogram.activity.ActivityService;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import it.unicas.chronogram.security.JwtAuthenticationFilter;
 import it.unicas.chronogram.security.JwtService;
+import it.unicas.chronogram.security.RestAccessDeniedHandler;
 import it.unicas.chronogram.security.RestAuthenticationEntryPoint;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,9 +21,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -72,6 +76,11 @@ class SecurityConfigCorsTest {
         RestAuthenticationEntryPoint restAuthenticationEntryPoint(ObjectMapper objectMapper) {
             return new RestAuthenticationEntryPoint(objectMapper);
         }
+
+        @Bean
+        RestAccessDeniedHandler restAccessDeniedHandler(ObjectMapper objectMapper) {
+            return new RestAccessDeniedHandler(objectMapper);
+        }
     }
 
     // ---- CORS allowlist ----
@@ -112,6 +121,31 @@ class SecurityConfigCorsTest {
         mockMvc.perform(post("/api/activities/list")
                         .contentType("application/json").content("{}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void llmRouteWithoutTokenReturns401() throws Exception {
+        // The LLM proxy bills a third-party provider per call: it must never be
+        // reachable anonymously. Authorization is decided by the filter chain
+        // before dispatch, so no LlmController bean is needed in this slice.
+        mockMvc.perform(post("/api/llm/prompt")
+                        .contentType("application/json").content("{\"prompt\":\"hi\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminRouteWithoutTokenReturns401() throws Exception {
+        mockMvc.perform(get("/api/admin/stats"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminRouteIsForbiddenForAnOrdinaryUser() throws Exception {
+        // Authenticated but without ROLE_ADMIN: must be 403, not 401, and must not
+        // reach the controller. The JSON envelope comes from RestAccessDeniedHandler.
+        mockMvc.perform(get("/api/admin/stats").with(user("ada@example.com").roles("USER")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test

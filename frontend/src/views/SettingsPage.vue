@@ -42,6 +42,12 @@
             <ion-label>Support</ion-label>
           </ion-item>
 
+          <!-- Solo per il ruolo ADMIN; l'accesso reale è comunque protetto dal backend. -->
+          <ion-item v-if="auth.isAdmin" button @click="goToAdmin">
+            <ion-icon slot="start" :icon="shieldCheckmarkOutline" class="input-icon" />
+            <ion-label>Administration</ion-label>
+          </ion-item>
+
           <ion-item button @click="goToDeleteAccount">
             <ion-icon slot="start" :icon="trashOutline" class="input-icon danger-text" />
             <ion-label class="danger-text">Delete Account</ion-label>
@@ -98,13 +104,20 @@ import {
 
 import {
   personOutline, lockClosedOutline, notificationsOutline, helpCircleOutline, exitOutline,
-  homeOutline, createOutline, trashOutline, settingsOutline
+  homeOutline, createOutline, trashOutline, settingsOutline, shieldCheckmarkOutline
 } from 'ionicons/icons';
 
+import { useAuthStore } from '@/store/auth';
+
 const router = useRouter();
+const auth = useAuthStore();
 
 const goToHome = () => {
   router.push({ name: 'Home' });
+};
+
+const goToAdmin = () => {
+  router.push({ name: 'AdminDashboard' });
 };
 
 const goToEditProfile = () => {

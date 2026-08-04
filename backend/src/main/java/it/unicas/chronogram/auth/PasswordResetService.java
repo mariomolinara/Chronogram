@@ -110,6 +110,9 @@ public class PasswordResetService {
         UserAuth user = userAuthRepository.findById(resetToken.getUserId())
                 .orElseThrow(() -> new ServiceException("User associated with reset token no longer exists."));
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        // The account no longer uses the password it was provisioned with, so the
+        // forced-change flag (set for the bootstrapped admin) is satisfied.
+        user.setMustChangePassword(false);
         user.setUpdatedAt(LocalDateTime.now());
         userAuthRepository.save(user);
 

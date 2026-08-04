@@ -5,6 +5,7 @@ import it.unicas.chronogram.auth.dto.LoginResponse;
 import it.unicas.chronogram.common.GlobalExceptionHandler;
 import it.unicas.chronogram.common.exception.ApiExceptions.EmailAlreadyExistsException;
 import it.unicas.chronogram.common.exception.ApiExceptions.ValidationException;
+import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import it.unicas.chronogram.security.JwtService;
 import org.junit.jupiter.api.Test;
@@ -109,7 +110,7 @@ class AuthControllerTest {
     @Test
     void loginReturnsFlatLoginResponse() throws Exception {
         when(authService.login("ada@example.com", "password123"))
-                .thenReturn(LoginResponse.success("ada@example.com", "jwt-token"));
+                .thenReturn(LoginResponse.success("ada@example.com", "jwt-token", Role.USER, false));
         Map<String, Object> body = Map.of("email", "ada@example.com", "password", "password123");
 
         mockMvc.perform(post("/api/auth/login").with(csrf())

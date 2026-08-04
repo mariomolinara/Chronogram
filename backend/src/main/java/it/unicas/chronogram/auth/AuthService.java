@@ -3,8 +3,11 @@ package it.unicas.chronogram.auth;
 import it.unicas.chronogram.auth.dto.LoginResponse;
 import it.unicas.chronogram.auth.dto.RegisterRequest;
 import it.unicas.chronogram.common.exception.ApiExceptions.EmailAlreadyExistsException;
+import it.unicas.chronogram.domain.LoginEvent;
+import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.domain.UserProfile;
+import it.unicas.chronogram.repository.LoginEventRepository;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import it.unicas.chronogram.repository.UserProfileRepository;
 import it.unicas.chronogram.security.JwtService;
@@ -33,15 +36,18 @@ public class AuthService {
 
     private final UserAuthRepository userAuthRepository;
     private final UserProfileRepository userProfileRepository;
+    private final LoginEventRepository loginEventRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public AuthService(UserAuthRepository userAuthRepository,
                        UserProfileRepository userProfileRepository,
+                       LoginEventRepository loginEventRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService) {
         this.userAuthRepository = userAuthRepository;
         this.userProfileRepository = userProfileRepository;
+        this.loginEventRepository = loginEventRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -103,8 +109,15 @@ public class AuthService {
             user.setLastLogin(now);
             user.setUpdatedAt(now);
             userAuthRepository.save(user);
+            // Append-only history: last_login alone cannot answer the "active on
+            // each of the last N days" question the admin dashboard asks.
+            loginEventRepository.save(new LoginEvent(user.getUserId(), now));
             log.info("Login successful for {}", email);
-            return LoginResponse.success(user.getEmail(), jwtService.generateToken(user.getEmail()));
+            Role role = user.getRole() == null ? Role.USER : user.getRole();
+            return LoginResponse.success(user.getEmail(),
+                    jwtService.generateToken(user.getEmail(), role),
+                    role,
+                    user.isMustChangePassword());
         }
 
         int attempts = user.getFailedLoginAttempts() + 1;

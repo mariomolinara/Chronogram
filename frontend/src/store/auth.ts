@@ -4,8 +4,20 @@ import { Preferences } from '@capacitor/preferences';
 import { api } from '@/composables/useApi';
 import { useRouter } from 'vue-router';
 
+/**
+ * Ruoli riconosciuti dal backend (`user_auth.role`).
+ */
+export type UserRole = 'USER' | 'ADMIN';
+
 interface User {
     username: string;
+    role: UserRole;
+    /**
+     * Vero finché l'account usa la password con cui è stato creato (caso
+     * dell'amministratore provisionato da `.env`): il router impedisce di
+     * navigare altrove finché non viene cambiata.
+     */
+    mustChangePassword: boolean;
 }
 
 /**
@@ -16,6 +28,8 @@ interface LoginResponse {
     token?: string;
     username: string;
     message?: string;
+    role?: UserRole;
+    mustChangePassword?: boolean;
 }
 
 /**
@@ -33,10 +47,20 @@ const USER_STORAGE_KEY = 'userData';
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
     const token = ref<string | null>(null);
+    /** Evita di rileggere lo storage a ogni navigazione (vedi checkAuthStatus). */
+    const sessionChecked = ref(false);
     const router = useRouter();
 
     const isAuthenticated = computed(() => !!token.value && !!user.value);
     const username = computed(() => user.value?.username);
+
+    /**
+     * Solo per decidere cosa mostrare nella UI. L'autorizzazione reale è del
+     * backend, che rilegge il ruolo dal database a ogni richiesta: nascondere il
+     * link non protegge nulla, protegge `hasRole('ADMIN')` su `/api/admin/**`.
+     */
+    const isAdmin = computed(() => user.value?.role === 'ADMIN');
+    const mustChangePassword = computed(() => user.value?.mustChangePassword === true);
 
     /**
      * Unica fonte di verità per il token: l'interceptor axios deve leggere il
@@ -86,22 +110,49 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         token.value = data.token;
-        user.value = { username: data.username };
+        user.value = {
+            username: data.username,
+            // Backend precedenti alla V3 non inviano il ruolo: si degrada a USER,
+            // il caso meno privilegiato.
+            role: data.role ?? 'USER',
+            mustChangePassword: data.mustChangePassword === true
+        };
 
         await persistSession(data.token, user.value);
 
         return data;
     }
 
+    /**
+     * Da chiamare dopo un cambio password riuscito: toglie il blocco senza
+     * costringere l'utente a rifare il login.
+     */
+    async function clearMustChangePassword(): Promise<void> {
+        if (!user.value || !token.value) {
+            return;
+        }
+        user.value = { ...user.value, mustChangePassword: false };
+        await persistSession(token.value, user.value);
+    }
+
     async function logout() {
         token.value = null;
         user.value = null;
+        // La sessione resta "verificata": lo storage è appena stato ripulito.
+        sessionChecked.value = true;
 
         await clearSession();
         router.push('/login');
     }
 
     async function checkAuthStatus() {
+        // Il router può chiamarla su ogni navigazione: dopo il primo tentativo lo
+        // stato in memoria è già autorevole, inutile rileggere lo storage.
+        if (sessionChecked.value) {
+            return;
+        }
+        sessionChecked.value = true;
+
         const restored = await restoreSession();
 
         if (restored) {
@@ -115,9 +166,12 @@ export const useAuthStore = defineStore('auth', () => {
         token,
         isAuthenticated,
         username,
+        isAdmin,
+        mustChangePassword,
         getToken,
         login,
         logout,
-        checkAuthStatus
+        checkAuthStatus,
+        clearMustChangePassword
     };
 });

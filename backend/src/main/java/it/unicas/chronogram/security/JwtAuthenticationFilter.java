@@ -1,6 +1,8 @@
 package it.unicas.chronogram.security;
 
 import io.jsonwebtoken.JwtException;
+import it.unicas.chronogram.domain.Role;
+import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -10,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -52,7 +55,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String email = jwtService.extractEmail(token);
                 userAuthRepository.findByEmailIgnoreCase(email)
                         .filter(u -> u.isActive())
-                        .ifPresent(user -> authenticate(request, user.getUserId(), user.getEmail()));
+                        .ifPresent(user -> authenticate(request, user));
             } catch (JwtException ex) {
                 log.debug("Rejected invalid JWT: {}", ex.getMessage());
             }
@@ -60,10 +63,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private void authenticate(HttpServletRequest request, Integer userId, String email) {
-        AuthPrincipal principal = new AuthPrincipal(userId, email);
+    /**
+     * The granted authority comes from the freshly loaded row, not from the
+     * token's {@code role} claim: a role revoked in the database takes effect on
+     * the next request instead of when the token expires.
+     */
+    private void authenticate(HttpServletRequest request, UserAuth user) {
+        Role role = user.getRole() == null ? Role.USER : user.getRole();
+        AuthPrincipal principal = new AuthPrincipal(user.getUserId(), user.getEmail(), role);
         var authentication = new UsernamePasswordAuthenticationToken(
-                principal, null, List.of());
+                principal, null, List.of(new SimpleGrantedAuthority(role.authority())));
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }

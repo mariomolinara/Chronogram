@@ -114,7 +114,9 @@ const handleLogin = async () => {
   try {
     await auth.login({ email: email.value, password: password.value });
     presentToast('Login successful!', 'success');
-    router.push({ name: 'Home' });
+    // L'amministratore atterra direttamente in back-office; se deve ancora
+    // cambiare la password di provisioning ci pensa il guard del router.
+    router.push({ name: auth.isAdmin ? 'AdminDashboard' : 'Home' });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     presentToast(errorMessage, 'danger');

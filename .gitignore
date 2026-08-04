@@ -46,3 +46,5 @@ keystore.properties
 # ...but keep the documented example
 !keystore.properties.example
 frontend/android/local.properties
+
+.claude/

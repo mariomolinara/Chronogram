@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Slice test for the public LLM endpoint. The controller returns the
+ * Slice test for the authenticated LLM endpoint. The controller returns the
  * {@link LlmResponse} object directly (legacy unwrapped contract), so the
  * assertions target the JSON root rather than an {@code ApiResponse} envelope.
  * Focus: request-DTO Bean Validation (400 on blank prompt) and that the

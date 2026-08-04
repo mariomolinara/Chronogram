@@ -70,6 +70,18 @@ chronogram:
     api-url: ${LLM_API_URL:https://openrouter.ai/api/v1/chat/completions}
     api-key: ${LLM_API_KEY:}
     default-model: ${LLM_DEFAULT_MODEL:deepseek/deepseek-chat-v3-0324:free}
+  admin:
+    # Built-in administrator, created on first boot. Leave ADMIN_EMAIL empty to
+    # skip provisioning entirely. ADMIN_INITIAL_PASSWORD is only used at creation
+    # time: the account starts flagged "must change password" and the value stops
+    # working once a new password is set from the admin page.
+    email: ${ADMIN_EMAIL:}
+    initial-password: ${ADMIN_INITIAL_PASSWORD:}
+  stats:
+    # Windows behind the dashboard metrics (see AdminService).
+    active-window-days: ${STATS_ACTIVE_WINDOW_DAYS:10}
+    regular-window-days: ${STATS_REGULAR_WINDOW_DAYS:7}
+    distribution-days: ${STATS_DISTRIBUTION_DAYS:30}
 
 management:
   endpoints:

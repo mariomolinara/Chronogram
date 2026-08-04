@@ -26,7 +26,8 @@ The goal of this project is to develop an Android application that allows users 
 * Brute-force protection (temporary account lockout)
 * Password reset via email (selector/verifier tokens)
 * Activity tracking with categories
-* LLM-assisted activity extraction from free text
+* LLM-assisted activity extraction from free text (signed-in users only)
+* Admin dashboard with participation metrics and CSV export
 * MySQL persistence with versioned schema (Flyway)
 
 ---
@@ -86,6 +87,8 @@ Key variables in `.env`:
 | `APP_CANONICAL_URL` | Public base URL used in password-reset links |
 | `LLM_API_URL`, `LLM_DEFAULT_MODEL`, `LLM_API_KEY` | LLM provider (default regolo.ai; key from https://dashboard.regolo.ai) |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` | SMTP settings (Gmail: use an App Password) |
+| `ADMIN_EMAIL`, `ADMIN_INITIAL_PASSWORD` | Built-in administrator, created on first boot (see [Admin area](#️-admin-area)) |
+| `STATS_ACTIVE_WINDOW_DAYS`, `STATS_REGULAR_WINDOW_DAYS`, `STATS_DISTRIBUTION_DAYS` | Dashboard metric windows (defaults 10 / 7 / 30) |
 
 > Save `.env` with **LF** (Unix) line endings.
 
@@ -163,6 +166,57 @@ entrypoint** proxying to the backend's embedded Tomcat:
 Only ports **80/443** (nginx) need to be exposed publicly. Keep MySQL (3306) and the
 backend (8080) private — remove their `ports:` mappings in production if the host is
 internet-facing.
+
+---
+
+## 🛡️ Admin area
+
+There are **no seeded user accounts**: participants register themselves from the app.
+The only exception is a single built-in administrator, provisioned from the
+environment on first boot.
+
+Set these in `.env` **before** starting the stack for the first time:
+
+```env
+ADMIN_EMAIL=admin@your-domain.example
+ADMIN_INITIAL_PASSWORD=a-long-random-password   # min 8 chars
+```
+
+On boot the backend creates the account with role `ADMIN` and flags it
+*must change password*. Sign in from the normal login screen: the app forces a
+password change, then lands on `/admin`.
+
+The account is deliberately constrained:
+
+* it **cannot be deleted** and its role cannot be changed (`user_auth.is_system`);
+* only its **email and password** can be edited, from the admin page itself;
+* it is excluded from the participant counts and from the users CSV.
+
+`ADMIN_INITIAL_PASSWORD` is only used at creation time — once the password is
+changed, the value in `.env` is inert and the account is never re-provisioned.
+
+### Dashboard
+
+| Metric | Definition |
+| --- | --- |
+| Registered users | accounts excluding administrators |
+| Active | at least one sign-in in the last `STATS_ACTIVE_WINDOW_DAYS` days (default 10) |
+| Regular | signed in on **every one** of the last `STATS_REGULAR_WINDOW_DAYS` days (default 7) |
+| Activities collected | all activity records, plus a per-day distribution chart |
+
+Activity and regularity are computed from the `login_event` table introduced in
+`V3`, so the figures start accumulating from the moment that migration is applied —
+earlier sign-ins were never recorded individually.
+
+### Export
+
+Two CSV files, downloadable from the dashboard:
+
+* `chronogram-activities.csv` — **pseudonymised**: a numeric `user_id`, never an email;
+* `chronogram-users.csv` — account and profile data; join on `user_id`.
+
+Both are UTF-8 with a BOM so Excel on Windows reads accented characters correctly.
+The users file contains personal data: treat it as such.
 
 ---
 

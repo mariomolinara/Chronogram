@@ -41,9 +41,12 @@ if (import.meta.env.DEV) {
 }
 
 // ⿤ Monta tutti i plugin
+// Pinia PRIMA del router: installare il router avvia subito la navigazione
+// iniziale, e il guard in router/index.ts usa lo store `auth`. Con l'ordine
+// invertito lo store verrebbe creato senza una Pinia attiva.
 app.use(IonicVue);
-app.use(router);
 app.use(pinia);
+app.use(router);
 
 // ⿥ Imposta tema
 document.documentElement.setAttribute('data-theme', 'mocha');

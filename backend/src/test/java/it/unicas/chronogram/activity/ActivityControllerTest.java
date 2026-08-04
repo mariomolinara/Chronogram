@@ -5,6 +5,7 @@ import it.unicas.chronogram.activity.dto.ActivityResponse;
 import it.unicas.chronogram.common.GlobalExceptionHandler;
 import it.unicas.chronogram.common.exception.ApiExceptions.ResourceNotFoundException;
 import it.unicas.chronogram.common.exception.ApiExceptions.ValidationException;
+import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import it.unicas.chronogram.security.AuthPrincipal;
 import it.unicas.chronogram.security.JwtService;
@@ -50,7 +51,7 @@ class ActivityControllerTest {
     @MockBean private UserAuthRepository userAuthRepository;
 
     private Authentication principal() {
-        AuthPrincipal p = new AuthPrincipal(55, "ada@example.com");
+        AuthPrincipal p = new AuthPrincipal(55, "ada@example.com", Role.USER);
         return new UsernamePasswordAuthenticationToken(p, null, List.of());
     }
 

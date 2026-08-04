@@ -13,7 +13,6 @@ export const PUBLIC_API_PATHS = [
   '/api/auth/register',
   '/api/auth/request-reset',
   '/api/auth/reset-password',
-  '/api/llm/prompt',
 ] as const;
 
 export type PublicApiPath = (typeof PUBLIC_API_PATHS)[number];

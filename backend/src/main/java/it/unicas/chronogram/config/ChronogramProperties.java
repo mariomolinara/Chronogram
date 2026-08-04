@@ -24,6 +24,12 @@ public class ChronogramProperties {
     @NestedConfigurationProperty
     private Llm llm = new Llm();
 
+    @NestedConfigurationProperty
+    private Admin admin = new Admin();
+
+    @NestedConfigurationProperty
+    private Stats stats = new Stats();
+
     @Getter
     @Setter
     public static class Security {
@@ -66,5 +72,34 @@ public class ChronogramProperties {
         private String apiUrl;
         private String apiKey;
         private String defaultModel;
+    }
+
+    /**
+     * Built-in administrator, provisioned at startup. Credentials live in the
+     * environment, never in the repository or in a Flyway seed.
+     */
+    @Getter
+    @Setter
+    public static class Admin {
+        /** Login of the administrator account. Blank disables provisioning. */
+        private String email;
+        /**
+         * Password used only when the account is first created. It is stored
+         * BCrypt-hashed and the account is flagged {@code must_change_password},
+         * so this value stops working as soon as the admin picks a new one.
+         */
+        private String initialPassword;
+    }
+
+    /** Windows behind the admin dashboard metrics. */
+    @Getter
+    @Setter
+    public static class Stats {
+        /** A user is "active" if they logged in at least once in this many days. */
+        private int activeWindowDays = 10;
+        /** A user is "regular" if they logged in on every one of these days. */
+        private int regularWindowDays = 7;
+        /** Length of the activity-per-day series returned to the dashboard. */
+        private int distributionDays = 30;
     }
 }
