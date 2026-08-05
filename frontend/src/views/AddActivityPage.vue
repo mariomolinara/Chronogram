@@ -567,9 +567,19 @@ async function handleMagicInput() {
     if (filled.length === 0) {
       // Estrazione vuota: la modale resta aperta col testo dell'utente, che
       // può correggerlo invece di ripartire da zero.
+      //
+      // Il testo NON dà per scontato che la colpa sia della frase: oggi il
+      // backend restituisce 200 con tutti i campi nulli anche quando la
+      // chiamata al provider fallisce (chiave assente, modello non
+      // autorizzato), quindi da qui i due casi sono indistinguibili. Vedi la
+      // nota per il backend: finché `LlmService` non segnala il guasto con uno
+      // stato d'errore, un'indisponibilità del servizio arriva all'utente come
+      // "non ho capito la tua frase".
       aiNotice.value = {
         tone: 'warning',
-        text: 'We couldn\'t recognise any activity details in that text. Try saying what you did, how long it took, what it cost and how you felt.'
+        text: 'We couldn\'t get any activity details out of that text. Try saying what you did, '
+            + 'how long it took, what it cost and how you felt — if it keeps happening the '
+            + 'assistant may be unavailable and you can fill the form yourself.'
       };
       return;
     }
