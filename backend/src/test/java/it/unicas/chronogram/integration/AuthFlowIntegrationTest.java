@@ -69,18 +69,19 @@ class AuthFlowIntegrationTest {
 
     @Test
     void registerThenLoginThenCreateAndListActivity() throws Exception {
-        // 1. Register
+        // 1. Register from the trusted domain -> auto-approved (ACTIVE)
         Map<String, Object> register = Map.of(
                 "name", "Ada", "surname", "Lovelace",
-                "email", "ada@example.com", "password", "password123",
+                "email", "ada@unicas.it", "password", "password123",
                 "birthday", "10-12-1815", "gender", "F", "address", "London");
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(register)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value("ACTIVE"));
 
-        assertThat(userAuthRepository.existsByEmailIgnoreCase("ada@example.com")).isTrue();
+        assertThat(userAuthRepository.existsByEmailIgnoreCase("ada@unicas.it")).isTrue();
 
         // 2. Duplicate registration -> 409
         mockMvc.perform(post("/api/auth/register")
@@ -89,7 +90,7 @@ class AuthFlowIntegrationTest {
                 .andExpect(status().isConflict());
 
         // 3. Login -> token
-        Map<String, Object> login = Map.of("email", "ada@example.com", "password", "password123");
+        Map<String, Object> login = Map.of("email", "ada@unicas.it", "password", "password123");
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(login)))
@@ -145,5 +146,29 @@ class AuthFlowIntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of("activityId", activityId))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void registrationFromUntrustedDomainStaysPendingAndCannotLogIn() throws Exception {
+        Map<String, Object> register = Map.of(
+                "name", "Grace", "surname", "Hopper",
+                "email", "grace@example.com", "password", "password123",
+                "birthday", "09-12-1906", "gender", "F", "address", "New York");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(register)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value("PENDING"));
+
+        // Correct password, but the account has not been approved yet: the login
+        // is refused with success=false and no token is issued.
+        Map<String, Object> login = Map.of("email", "grace@example.com", "password", "password123");
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(login)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.token").isEmpty());
     }
 }
