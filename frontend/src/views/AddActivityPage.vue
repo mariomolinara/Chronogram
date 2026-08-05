@@ -338,7 +338,7 @@ import {
   chatbubbleEllipsesOutline, barbellOutline, peopleOutline, cartOutline
 } from 'ionicons/icons';
 
-import { api } from '@/composables/useApi';
+import { api, apiErrorMessage } from '@/composables/useApi';
 import { useToast } from '@/composables/useToast';
 import { useActivityStore } from '@/store/activityStore';
 
@@ -568,18 +568,17 @@ async function handleMagicInput() {
       // Estrazione vuota: la modale resta aperta col testo dell'utente, che
       // può correggerlo invece di ripartire da zero.
       //
-      // Il testo NON dà per scontato che la colpa sia della frase: oggi il
-      // backend restituisce 200 con tutti i campi nulli anche quando la
-      // chiamata al provider fallisce (chiave assente, modello non
-      // autorizzato), quindi da qui i due casi sono indistinguibili. Vedi la
-      // nota per il backend: finché `LlmService` non segnala il guasto con uno
-      // stato d'errore, un'indisponibilità del servizio arriva all'utente come
-      // "non ho capito la tua frase".
+      // Questo ramo parla SOLO della frase, ed è corretto farlo: il backend
+      // risponde 200 con i campi nulli unicamente quando il provider ha
+      // risposto e non c'era nulla di utile da estrarre. Un guasto tecnico
+      // (chiave assente, modello non autorizzato, provider irraggiungibile)
+      // arriva ora come 502/503 con il proprio messaggio e finisce nel `catch`
+      // qui sotto. Prima i due casi erano indistinguibili e un 401 del provider
+      // veniva presentato all'utente come "non ho capito la tua frase".
       aiNotice.value = {
         tone: 'warning',
-        text: 'We couldn\'t get any activity details out of that text. Try saying what you did, '
-            + 'how long it took, what it cost and how you felt — if it keeps happening the '
-            + 'assistant may be unavailable and you can fill the form yourself.'
+        text: 'We couldn\'t recognise any activity details in that text. Try saying what you did, '
+            + 'how long it took, what it cost and how you felt.'
       };
       return;
     }
@@ -595,12 +594,18 @@ async function handleMagicInput() {
             : 'Fields filled by AI — check them and save',
         hasErrors.value ? 'warning' : 'success'
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
+    // Guasto tecnico: 502 (provider che risponde male o non risponde) o 503
+    // (assistente non configurato su questo ambiente). Il backend manda già un
+    // messaggio scritto per l'utente finale e non espone dettagli di provider,
+    // chiavi o modelli; `apiErrorMessage` lo preferisce a qualsiasi fallback e
+    // copre da sé il caso "server irraggiungibile".
     aiNotice.value = {
       tone: 'error',
-      text: err.response?.data?.message
-          || err.response?.data?.error
-          || 'The AI assistant is unavailable right now. Try again, or close this and fill the form yourself.'
+      text: apiErrorMessage(
+          err,
+          'The AI assistant is unavailable right now. Try again, or close this and fill the form yourself.'
+      )
     };
   } finally {
     isExtracting.value = false;

@@ -2,6 +2,8 @@ package it.unicas.chronogram.common;
 
 import it.unicas.chronogram.common.exception.ApiExceptions.AuthenticationFailedException;
 import it.unicas.chronogram.common.exception.ApiExceptions.EmailAlreadyExistsException;
+import it.unicas.chronogram.common.exception.ApiExceptions.FeatureUnavailableException;
+import it.unicas.chronogram.common.exception.ApiExceptions.UpstreamServiceException;
 import it.unicas.chronogram.common.exception.ApiExceptions.ResourceNotFoundException;
 import it.unicas.chronogram.common.exception.ApiExceptions.ServiceException;
 import it.unicas.chronogram.common.exception.ApiExceptions.ValidationException;
@@ -68,6 +70,30 @@ class GlobalExceptionHandlerTest {
         assertFail(response, HttpStatus.INTERNAL_SERVER_ERROR,
                 "An internal server error occurred. Please try again later.");
         assertThat(response.getBody().message()).doesNotContain("10.0.0.5");
+    }
+
+    @Test
+    void upstreamServiceExceptionMapsTo502AndKeepsTheUserFacingMessage() {
+        // 502 e non 500: il processo sta bene, e' una dipendenza esterna ad avere
+        // fallito. Il messaggio e' gia' scritto per l'utente da chi lancia.
+        String userMessage = "The AI assistant is temporarily unavailable. "
+                + "Please fill the form manually and try again later.";
+        ResponseEntity<ApiResponse<Void>> response = handler.handleUpstream(
+                new UpstreamServiceException(userMessage,
+                        new IllegalStateException("401 Unauthorized from api.provider.example")));
+
+        assertFail(response, HttpStatus.BAD_GATEWAY, userMessage);
+        assertThat(response.getBody().message())
+                .doesNotContain("401")
+                .doesNotContain("api.provider.example");
+    }
+
+    @Test
+    void featureUnavailableMapsTo503() {
+        String userMessage = "The AI assistant is temporarily unavailable. "
+                + "Please fill the form manually and try again later.";
+        assertFail(handler.handleFeatureUnavailable(new FeatureUnavailableException(userMessage)),
+                HttpStatus.SERVICE_UNAVAILABLE, userMessage);
     }
 
     @Test

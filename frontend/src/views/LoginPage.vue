@@ -74,7 +74,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import { safeRedirectTarget } from '@/router';
 import { useAuthStore } from '@/store/auth';
 import { useToast } from '@/composables/useToast';
 import {
@@ -89,6 +90,7 @@ const LONG_MESSAGE_LENGTH = 45;
 const LONG_TOAST_DURATION = 6000;
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
 
 const isLoading = ref(false);
@@ -119,9 +121,14 @@ const handleLogin = async () => {
   try {
     await auth.login({ email: email.value, password: password.value });
     presentToast('Login successful!', 'success');
-    // L'amministratore atterra direttamente in back-office; se deve ancora
+
+    // Se il guard ci ha mandati qui da una pagina privata, si riprende da
+    // quella: chi apre un link diretto e deve autenticarsi non viene scaricato
+    // sulla home. Il valore è filtrato (solo path interni) per non farne un
+    // open redirect. L'amministratore atterra in back-office; se deve ancora
     // cambiare la password di provisioning ci pensa il guard del router.
-    router.push({ name: auth.isAdmin ? 'AdminDashboard' : 'Home' });
+    const target = safeRedirectTarget(route.query.redirect);
+    router.push(target ?? { name: auth.isAdmin ? 'AdminDashboard' : 'Home' });
   } catch (error) {
     // Il backend risponde 200 anche quando l'accesso è negato: lo store rilancia
     // il suo `message`, che qui è l'unica spiegazione disponibile (account in

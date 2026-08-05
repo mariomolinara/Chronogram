@@ -127,29 +127,33 @@ export function initApiInterceptors() {
             const authStore = useAuthStore();
 
             /**
-             * Gestione specifica per errori 401 Unauthorized
+             * Gestione specifica per errori 401 Unauthorized.
              *
-             * Quando riceviamo un 401:
-             * 1. Disconnetto l'utente (logout)
-             * 2. Mostro un toast di notifica
-             * 3. Reindirizzo alla pagina di login (se non ci siamo già)
+             * Il token è scaduto o è stato revocato mentre l'app lo teneva
+             * ancora per buono: si chiude la sessione e si torna al login,
+             * conservando la pagina da cui si veniva.
+             *
+             * Il redirect NON è più duplicato (prima lo facevano sia `logout()`
+             * sia questo handler, con la prima navigazione annullata dalla
+             * seconda e una promise rifiutata a vuoto) e non è più condizionato
+             * a `currentRoute`: `logout()` è l'unico responsabile del ritorno al
+             * login, così una sola navigazione parte e un suo fallimento non
+             * lascia l'utente su una pagina privata senza sessione.
              */
             if (error.response && error.response.status === 401) {
-                // Effettua il logout pulendo lo stato di autenticazione
-                await authStore.logout();
+                const from = router.currentRoute.value;
+                const target = from.name === 'Login' || !from.matched.length
+                    ? undefined
+                    : from.fullPath;
 
-                // Mostra una notifica all'utente
+                await authStore.logout(target);
+
                 const toast = await toastController.create({
                     message: 'Sessione scaduta o non autorizzata. Effettua nuovamente il login.',
-                    duration: 3000, // Durata di 3 secondi
-                    color: 'warning' // Stile di avvertimento
+                    duration: 3000,
+                    color: 'warning'
                 });
-                toast.present();
-
-                // Reindirizza alla login solo se non siamo già sulla pagina di login
-                if (router.currentRoute.value.name !== 'Login') {
-                    router.push({ name: 'Login' });
-                }
+                await toast.present();
             }
 
             // Propaga l'errore per permettere una gestione specifica nei componenti

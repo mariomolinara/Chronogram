@@ -56,6 +56,26 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail("An internal server error occurred. Please try again later."));
     }
 
+    /**
+     * Guasto di una dipendenza esterna. Il dettaglio tecnico (status del
+     * provider, corpo dell'errore, parametri della chiamata) e' gia' stato
+     * loggato a ERROR da chi ha lanciato l'eccezione, dove il contesto era
+     * disponibile: qui basta una riga che colleghi quel guasto alla risposta
+     * HTTP, senza raddoppiare lo stack trace nei log.
+     */
+    @ExceptionHandler(UpstreamServiceException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUpstream(UpstreamServiceException ex) {
+        log.warn("Upstream dependency failure, responding 502 Bad Gateway");
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ApiResponse.fail(ex.getMessage()));
+    }
+
+    /** Funzionalita' non configurata su questo ambiente: nulla da riprovare subito. */
+    @ExceptionHandler(FeatureUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFeatureUnavailable(FeatureUnavailableException ex) {
+        log.warn("Feature not available in this environment, responding 503 Service Unavailable");
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.fail(ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception ex) {
         log.error("Unexpected error", ex);

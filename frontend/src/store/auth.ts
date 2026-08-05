@@ -155,14 +155,35 @@ export const useAuthStore = defineStore('auth', () => {
         await persistSession(token.value, user.value);
     }
 
-    async function logout() {
+    /**
+     * Chiude la sessione e riporta al login.
+     *
+     * @param redirectTo pagina da riaprire dopo un nuovo accesso. La passa
+     *   l'interceptor quando la sessione è scaduta sotto i piedi dell'utente,
+     *   così il login riporta dov'era invece che sulla home. Assente nel logout
+     *   volontario: lì tornare al punto di partenza non è desiderato.
+     *
+     * La navigazione è attesa e i suoi fallimenti sono assorbiti: un redirect
+     * deciso da un guard fa rifiutare la promise di `push`, e in un handler
+     * axios quel rifiuto diventerebbe una unhandled rejection senza che
+     * nessuno se ne accorga.
+     */
+    async function logout(redirectTo?: string) {
         token.value = null;
         user.value = null;
         // La sessione resta "verificata": lo storage è appena stato ripulito.
         sessionChecked.value = true;
 
         await clearSession();
-        router.push('/login');
+
+        try {
+            await router.push(redirectTo
+                ? { name: 'Login', query: { redirect: redirectTo } }
+                : { name: 'Login' });
+        } catch {
+            /* navigazione annullata o ridiretta da un guard: la sessione è
+               comunque chiusa, che è ciò che conta qui. */
+        }
     }
 
     async function checkAuthStatus() {

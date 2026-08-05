@@ -62,6 +62,29 @@ function openAndCancelBirthday(): void {
   cy.get('ion-modal.birthday-modal').should('have.class', 'overlay-hidden')
 }
 
+/** Sessione utente valida, con le chiamate del profilo stubbate. */
+function signIn(): void {
+  cy.intercept('POST', '**/api/auth/login', {
+    statusCode: 200,
+    body: {
+      success: true,
+      message: 'Login successful!',
+      username: 'mario.rossi@unicas.it',
+      token: 'stub-token',
+      role: 'USER',
+      mustChangePassword: false
+    }
+  }).as('login')
+  cy.intercept('POST', '**/api/user/**', { body: { success: true, data: {} } })
+  cy.intercept('POST', '**/api/activities/**', { body: { success: true, data: [] } })
+
+  cy.visit('/login')
+  cy.get('ion-input').eq(0).find('input').type('mario.rossi@unicas.it')
+  cy.get('ion-input').eq(1).find('input').type('Password1!')
+  cy.contains('ion-button', 'Login').click()
+  cy.wait('@login')
+}
+
 describe('Birthday modal - nessun residuo dopo il ciclo di vita', () => {
   it('registrazione: aperture e chiusure ripetute lasciano la pagina usabile', () => {
     cy.visit('/register')
@@ -93,6 +116,11 @@ describe('Birthday modal - nessun residuo dopo il ciclo di vita', () => {
   })
 
   it('modifica profilo: stessa modale, stesso esito', () => {
+    // `/edit-profile` è una pagina privata: dal momento in cui il router ha un
+    // guard di sessione, aprirla senza autenticarsi porta al login e la modale
+    // non esiste nemmeno. Si entra come farebbe un utente.
+    signIn()
+
     cy.visit('/edit-profile')
     expectNoOverlayResidue()
 
