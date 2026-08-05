@@ -87,6 +87,13 @@ chronogram:
     auto-approve-domains: ${REGISTRATION_AUTO_APPROVE_DOMAINS:unicas.it}
     # Email the administrator when a registration is waiting for a decision.
     notify-admin: ${REGISTRATION_NOTIFY_ADMIN:true}
+  support:
+    # Mailbox receiving the messages sent from the in-app support form
+    # (POST /api/support/messages). Leave empty to deliver them to the built-in
+    # administrator instead: the address currently stored on the system account,
+    # falling back to ADMIN_EMAIL. With none of the three set the endpoint
+    # answers 503 rather than silently discarding a user's message.
+    email: ${SUPPORT_EMAIL:}
   stats:
     # Windows behind the dashboard metrics (see AdminService).
     active-window-days: ${STATS_ACTIVE_WINDOW_DAYS:10}

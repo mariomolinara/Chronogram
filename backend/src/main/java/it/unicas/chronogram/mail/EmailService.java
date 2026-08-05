@@ -135,6 +135,38 @@ public class EmailService {
                 "Registration awaiting approval", body);
     }
 
+    /**
+     * Forwards a message written on the support screen to the support mailbox.
+     *
+     * <p>The reply-to is the author's address, so answering the ticket reaches the
+     * user directly instead of the no-reply sender. Both the subject and the body
+     * are free text typed by that user and are treated as hostile: the subject is
+     * stripped of line breaks before it becomes a header (a bare CR/LF there is
+     * how extra headers get injected) and everything else is HTML-escaped.
+     *
+     * @param toEmail     support mailbox
+     * @param senderEmail address of the authenticated user who wrote the message
+     * @param senderName  their display name, may be blank
+     * @param subject     user-supplied subject
+     * @param message     user-supplied body
+     */
+    public void sendSupportMessage(String toEmail, String senderEmail, String senderName,
+                                   String subject, String message) {
+        String who = StringUtils.hasText(senderName)
+                ? escape(senderName) + " (" + escape(senderEmail) + ")"
+                : escape(senderEmail);
+        String body = """
+                <p>A Chronogram user has sent a message from the support screen.</p>
+                <p><strong>From:</strong> %s</p>
+                <p><strong>Subject:</strong> %s</p>
+                <div class="note"><p class="note-label">Message</p><p>%s</p></div>
+                <p>Reply to this email to answer the user directly.</p>
+                """.formatted(who, escape(subject), escape(message).replace("\n", "<br>"));
+
+        send(toEmail, senderEmail, "[Chronogram Support] " + headerSafe(subject),
+                "Support request", body, "Could not send the support message.");
+    }
+
     // ---- internals ----
 
     private void send(String toEmail, String subject, String heading, String bodyHtml) {
@@ -142,11 +174,19 @@ public class EmailService {
     }
 
     private void send(String toEmail, String subject, String heading, String bodyHtml, String failureMessage) {
+        send(toEmail, null, subject, heading, bodyHtml, failureMessage);
+    }
+
+    private void send(String toEmail, String replyTo, String subject, String heading,
+                      String bodyHtml, String failureMessage) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
             if (StringUtils.hasText(from)) {
                 helper.setFrom(from);
+            }
+            if (StringUtils.hasText(replyTo)) {
+                helper.setReplyTo(replyTo);
             }
             helper.setTo(toEmail);
             helper.setSubject(subject);
@@ -157,6 +197,17 @@ public class EmailService {
             log.error("Failed to send email '{}' to {}", subject, toEmail, e);
             throw new ServiceException(failureMessage, e);
         }
+    }
+
+    /**
+     * Collapses CR/LF (and the surrounding blanks) so a user-supplied string can
+     * safely be placed in a header line.
+     */
+    private static String headerSafe(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceAll("[\\r\\n]+", " ").trim();
     }
 
     /** Renders an optional administrator-written note, or nothing at all. */

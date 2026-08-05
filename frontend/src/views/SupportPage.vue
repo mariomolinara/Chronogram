@@ -62,6 +62,8 @@
                 v-model="subject"
                 placeholder="Enter subject"
                 required
+                :maxlength="SUBJECT_MAX_LENGTH"
+                :counter="true"
                 :aria-invalid="!!errorFor('subject')"
             ></ion-input>
           </ion-item>
@@ -73,13 +75,23 @@
                 v-model="message"
                 placeholder="Describe your issue"
                 auto-grow
+                :maxlength="MESSAGE_MAX_LENGTH"
+                :counter="true"
                 :aria-invalid="!!errorFor('message')"
             ></ion-textarea>
           </ion-item>
           <FieldError :message="errorFor('message')" />
 
-          <ion-button expand="block" class="send-button" @click="sendMessage">
-            Send Message
+          <!-- Premibile anche a form incompleto: è la pressione a dire cosa
+               manca. Si disabilita solo mentre l'invio è in volo. -->
+          <ion-button
+              expand="block"
+              class="send-button"
+              :disabled="isSending"
+              @click="sendMessage"
+          >
+            <ion-spinner v-if="isSending" slot="start" name="crescent" />
+            {{ isSending ? 'Sending…' : 'Send Message' }}
           </ion-button>
         </ion-card-content>
       </ion-card>
@@ -93,11 +105,12 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonItem,
   IonInput, IonTextarea, IonButton, IonLabel, IonCard, IonCardContent,
   IonCardHeader, IonCardTitle, IonIcon, IonAccordionGroup, IonAccordion,
-  IonButtons
+  IonButtons, IonSpinner
 } from '@ionic/vue';
 import { searchOutline, settingsOutline } from 'ionicons/icons';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { api, apiErrorMessage } from '@/composables/useApi';
 import { useToast } from '@/composables/useToast';
 import {
   collectErrors, errorSummary, isBlank, useFormValidation
@@ -114,9 +127,15 @@ function goTo(name: string) {
   router.push({ name });
 }
 
+/** Limiti di `SupportMessageRequest` lato backend: la UI li rispecchia. */
+const SUBJECT_MAX_LENGTH = 150;
+const MESSAGE_MAX_LENGTH = 2000;
+
 // Inputs for user message
 const subject = ref('');
 const message = ref('');
+/** Invio in corso: il pulsante non deve poter partire due volte. */
+const isSending = ref(false);
 
 // FAQ sample questions and answers
 const faq = [
@@ -146,28 +165,57 @@ const { errors, errorFor, fieldClass, validateOnSubmit, reset: resetValidation }
         message: 'Subject is required: summarise the issue in a few words'
       },
       {
+        field: 'subject',
+        invalid: subject.value.trim().length > SUBJECT_MAX_LENGTH,
+        message: `Subject must be ${SUBJECT_MAX_LENGTH} characters or fewer`
+      },
+      {
         field: 'message',
         invalid: isBlank(message.value),
         message: 'Message is required: describe what happened and what you expected'
+      },
+      {
+        field: 'message',
+        invalid: message.value.trim().length > MESSAGE_MAX_LENGTH,
+        message: `Message must be ${MESSAGE_MAX_LENGTH} characters or fewer`
       }
     ]), REQUIRED_ORDER);
 
-// Handle message submission and show toast
-// NOTA: il messaggio non viene ancora inviato da nessuna parte (manca l'endpoint
-// lato backend): qui resta un `console.log`.
+/**
+ * Invia la richiesta di assistenza.
+ *
+ * I limiti sono già imposti dai `maxlength` dei campi: le regole qui sopra
+ * coprono il caso in cui il testo arrivi da un incolla programmatico o da un
+ * autofill, dove `maxlength` non tronca sempre.
+ */
 async function sendMessage() {
   if (!(await validateOnSubmit())) {
     await showToast(errorSummary(errors.value), 'danger');
     return;
   }
 
-  console.log('Message sent:', { subject: subject.value, message: message.value });
+  isSending.value = true;
+  try {
+    await api.post('/api/support/messages', {
+      subject: subject.value.trim(),
+      message: message.value.trim()
+    });
 
-  subject.value = '';
-  message.value = '';
-  resetValidation();
+    subject.value = '';
+    message.value = '';
+    resetValidation();
 
-  await showToast('Your message has been sent!', 'success');
+    await showToast('Your message has been sent!', 'success');
+  } catch (err: unknown) {
+    // Il backend scrive già un messaggio per l'utente finale: si preferisce
+    // quello a qualsiasi testo generico.
+    await showToast(
+        apiErrorMessage(err, 'Could not send your message. Please try again.'),
+        'danger'
+    );
+  } finally {
+    isSending.value = false;
+  }
 }
 </script>
 

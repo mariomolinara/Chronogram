@@ -56,6 +56,11 @@ public class SecurityConfig {
                         // behind authentication so it cannot be abused by anonymous callers.
                         .requestMatchers("/api/llm/**").authenticated()
                         .requestMatchers("/api/activities/**").authenticated()
+                        // Self-service account data and the support form: any signed-in
+                        // user, admin or not. Both resolve the subject from the token,
+                        // so authentication is the only authorisation they need.
+                        .requestMatchers("/api/profile/**").authenticated()
+                        .requestMatchers("/api/support/**").authenticated()
                         // Back-office: aggregate stats and full-database export.
                         .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
                         // Catch-all for any future /api endpoint added without an

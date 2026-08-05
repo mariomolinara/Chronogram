@@ -33,6 +33,9 @@ public class ChronogramProperties {
     @NestedConfigurationProperty
     private Registration registration = new Registration();
 
+    @NestedConfigurationProperty
+    private Support support = new Support();
+
     @Getter
     @Setter
     public static class Security {
@@ -120,6 +123,21 @@ public class ChronogramProperties {
          * happens to open the back office.
          */
         private boolean notifyAdmin = true;
+    }
+
+    /** Where the in-app support form delivers. */
+    @Getter
+    @Setter
+    public static class Support {
+        /**
+         * Mailbox that receives the messages sent from the support screen. Left
+         * empty - the default - the messages go to the built-in administrator
+         * instead: the address stored on the system account, falling back to
+         * {@code chronogram.admin.email}. With none of the three available the
+         * endpoint reports the feature as unconfigured rather than dropping a
+         * message on the floor.
+         */
+        private String email;
     }
 
     /** Windows behind the admin dashboard metrics. */

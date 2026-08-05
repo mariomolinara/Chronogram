@@ -95,6 +95,56 @@ class EmailServiceTest {
                 .hasRootCauseInstanceOf(MailSendException.class);
     }
 
+    /**
+     * The support message is the only mail whose subject and body are typed by an
+     * ordinary user, so it is also the only one where escaping and header hygiene
+     * are load-bearing rather than theoretical.
+     */
+    @Test
+    void supportMessageCarriesTheAuthorAsReplyToAndEscapesTheirText() throws Exception {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        MimeMessage mime = newMimeMessage();
+        when(mailSender.createMimeMessage()).thenReturn(mime);
+
+        EmailService service = new EmailService(mailSender, "noreply@chronogram.io");
+
+        service.sendSupportMessage("support@chronogram.io", "ada@example.com", "Ada Lovelace",
+                "Export <broken>", "It says <script>alert(1)</script> and then stops.");
+
+        verify(mailSender).send(mime);
+        assertThat(mime.getRecipients(Message.RecipientType.TO)[0].toString())
+                .isEqualTo("support@chronogram.io");
+        // Answering the ticket must reach the user, not the no-reply sender.
+        assertThat(mime.getReplyTo()[0].toString()).isEqualTo("ada@example.com");
+        assertThat(mime.getSubject()).isEqualTo("[Chronogram Support] Export <broken>");
+
+        String body = bodyOf(mime);
+        assertThat(body).contains("Ada Lovelace");
+        assertThat(body).contains("ada@example.com");
+        // The user's markup is rendered as text, never as live HTML.
+        assertThat(body).doesNotContain("<script>");
+        assertThat(body).contains("&lt;script&gt;");
+    }
+
+    /**
+     * A bare CR/LF in a subject is how extra headers get injected into a message;
+     * it must not survive into the header line.
+     */
+    @Test
+    void supportSubjectCannotInjectExtraHeaders() throws Exception {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        MimeMessage mime = newMimeMessage();
+        when(mailSender.createMimeMessage()).thenReturn(mime);
+
+        EmailService service = new EmailService(mailSender, "noreply@chronogram.io");
+
+        service.sendSupportMessage("support@chronogram.io", "ada@example.com", null,
+                "Hello\r\nBcc: victim@example.com", "Body.");
+
+        assertThat(mime.getSubject()).isEqualTo("[Chronogram Support] Hello Bcc: victim@example.com");
+        assertThat(mime.getHeader("Bcc")).isNull();
+    }
+
     @Test
     void wrapsMimeCreationFailureAndDoesNotSend() {
         JavaMailSender mailSender = mock(JavaMailSender.class);

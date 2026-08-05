@@ -121,7 +121,23 @@ describe('Birthday modal - nessun residuo dopo il ciclo di vita', () => {
     // non esiste nemmeno. Si entra come farebbe un utente.
     signIn()
 
+    // La pagina ora carica il profilo prima di mostrare il form: senza questo
+    // stub resterebbe sullo stato di errore e non ci sarebbe nessuna modale.
+    cy.intercept('GET', '**/api/profile/me', {
+      statusCode: 200,
+      body: {
+        name: 'Mario',
+        surname: 'Rossi',
+        address: 'Via Roma 1',
+        phone: '3331112222',
+        email: 'mario.rossi@unicas.it',
+        birthday: null,
+        gender: 'male'
+      }
+    }).as('profile')
+
     cy.visit('/edit-profile')
+    cy.wait('@profile')
     expectNoOverlayResidue()
 
     openAndConfirmBirthday()
@@ -129,7 +145,8 @@ describe('Birthday modal - nessun residuo dopo il ciclo di vita', () => {
     openAndCancelBirthday()
     expectNoOverlayResidue()
 
-    cy.get('ion-input').eq(0).find('input').type('Giulia')
+    // Il primo campo è Name, ora precompilato: si svuota prima di scrivere.
+    cy.get('ion-input').eq(0).find('input').clear().type('Giulia')
     cy.get('ion-input').eq(0).find('input').should('have.value', 'Giulia')
   })
 })
