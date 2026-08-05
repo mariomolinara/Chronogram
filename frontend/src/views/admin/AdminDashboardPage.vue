@@ -28,6 +28,33 @@
         </div>
 
         <template v-else-if="stats">
+          <!-- ── Partecipanti ────────────────────────────────────────── -->
+          <!-- Prima delle metriche: se qualcuno aspetta una decisione, è la
+               sola cosa in questa pagina che richiede un'azione. -->
+          <section class="glass-card panel users-panel" aria-labelledby="users-heading">
+            <div class="users-text">
+              <h2 id="users-heading" class="section-title">
+                Participants
+                <span
+                    v-if="pendingCount > 0"
+                    class="pending-badge"
+                    :aria-label="`${pendingCount} registrations waiting for approval`"
+                >
+                  {{ pendingCount }} pending
+                </span>
+              </h2>
+              <p class="panel-note users-note">
+                {{ pendingCount > 0
+                  ? 'Registrations are waiting for approval: until then those people cannot sign in.'
+                  : 'Approve, block or remove participant accounts.' }}
+              </p>
+            </div>
+            <ion-button :fill="pendingCount > 0 ? 'solid' : 'outline'" @click="goToUsers">
+              <ion-icon slot="start" :icon="peopleOutline" />
+              {{ pendingCount > 0 ? 'Review requests' : 'Manage participants' }}
+            </ion-button>
+          </section>
+
           <!-- ── Metriche ────────────────────────────────────────────── -->
           <section aria-labelledby="metrics-heading">
             <h2 id="metrics-heading" class="section-title">Overview</h2>
@@ -182,9 +209,11 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonIcon, IonButton,
-  IonButtons, IonSpinner, alertController, toastController
+  IonButtons, IonSpinner, alertController, onIonViewWillEnter, toastController
 } from '@ionic/vue';
-import { alertCircleOutline, downloadOutline, exitOutline, keyOutline } from 'ionicons/icons';
+import {
+  alertCircleOutline, downloadOutline, exitOutline, keyOutline, peopleOutline
+} from 'ionicons/icons';
 import { api } from '@/composables/useApi';
 import { useAuthStore } from '@/store/auth';
 
@@ -208,6 +237,7 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const stats = ref<AdminStats | null>(null);
+const pendingCount = ref(0);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const downloading = ref<'activities' | 'users' | null>(null);
@@ -298,6 +328,25 @@ async function loadStats() {
 }
 
 /**
+ * Le statistiche non contano gli account in attesa: il totale arriva dalla
+ * lista utenti, che lo porta con sé in `counts` indipendentemente dal filtro.
+ * Si chiede una sola riga (`size=1`) perché qui serve solo il numero, e un
+ * fallimento lascia semplicemente il badge assente: non deve rompere la pagina.
+ */
+async function loadPendingCount() {
+  try {
+    const { data } = await api.get<{ data: { counts: { pending: number } } }>(
+        '/api/admin/users', { params: { size: 1 } }
+    );
+    pendingCount.value = data.data?.counts?.pending ?? 0;
+  } catch {
+    pendingCount.value = 0;
+  }
+}
+
+const goToUsers = () => router.push({ name: 'AdminUsers' });
+
+/**
  * Scarica un CSV. La richiesta passa dall'istanza axios autenticata, quindi non
  * si può usare un semplice link: il blob viene materializzato e rilasciato
  * subito dopo per non trattenere memoria.
@@ -340,7 +389,7 @@ async function confirmLogout() {
 }
 
 onMounted(async () => {
-  await loadStats();
+  await Promise.all([loadStats(), loadPendingCount()]);
   // Il wrapper esiste solo dopo che i dati sono arrivati (v-else sul loading).
   await nextTick();
   if (chartHost.value && typeof ResizeObserver !== 'undefined') {
@@ -348,6 +397,17 @@ onMounted(async () => {
       chartWidth.value = Math.max(Math.round(entry.contentRect.width), 120);
     });
     resizeObserver.observe(chartHost.value);
+  }
+});
+
+/**
+ * Ionic tiene la pagina montata quando si naviga verso la lista utenti: senza
+ * questo, tornando indietro dopo aver approvato una richiesta il badge
+ * mostrerebbe ancora il conteggio di prima. `onMounted` non basta.
+ */
+onIonViewWillEnter(() => {
+  if (stats.value) {
+    void loadPendingCount();
   }
 });
 
@@ -383,6 +443,32 @@ onUnmounted(() => {
   font-size: var(--font-sm);
   font-weight: var(--font-weight-medium);
   color: var(--subtext0);
+}
+
+/* ── Partecipanti ─────────────────────────────────────────── */
+
+.users-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.users-note {
+  margin-bottom: 0;
+}
+
+/* Il badge non affida il significato al solo colore: porta anche la parola. */
+.pending-badge {
+  font-size: var(--font-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--peach);
+  border: 1px solid var(--peach);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
 }
 
 /* ── Metriche ─────────────────────────────────────────────── */

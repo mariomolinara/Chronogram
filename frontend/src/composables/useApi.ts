@@ -44,6 +44,42 @@ export const api = axios.create({
 });
 
 /**
+ * Estrae il messaggio da mostrare all'utente a partire da un errore di rete.
+ *
+ * Ordine di preferenza:
+ * 1. `response.data.message` — il testo scritto dal backend nell'envelope
+ *    `ApiResponse` (es. "Only a pending account can be approved"): è l'unico che
+ *    spiega davvero cosa è successo;
+ * 2. il messaggio di un `Error` applicativo lanciato dal client;
+ * 3. il fallback fornito dal chiamante.
+ *
+ * Il caso "richiesta partita ma nessuna risposta" (server irraggiungibile)
+ * scavalca il punto 2: "Network Error" di axios non dice nulla all'utente.
+ */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+    const candidate = error as {
+        response?: { data?: { message?: string } };
+        request?: unknown;
+        message?: string;
+    } | null;
+
+    const fromServer = candidate?.response?.data?.message;
+    if (typeof fromServer === 'string' && fromServer.trim()) {
+        return fromServer;
+    }
+
+    if (candidate?.request && !candidate.response) {
+        return 'Could not reach the server. Please check your connection and try again.';
+    }
+
+    if (error instanceof Error && error.message.trim()) {
+        return error.message;
+    }
+
+    return fallback;
+}
+
+/**
  * Funzione per inizializzare gli intercettori di risposta axios
  *
  * Gli intercettori permettono di:

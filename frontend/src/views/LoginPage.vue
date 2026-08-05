@@ -33,6 +33,17 @@
             </ion-item>
           </ion-list>
 
+          <!--
+            Il toast dura pochi secondi ed è facile da mancare: gli esiti che
+            spiegano perché l'accesso è negato (account in attesa di
+            approvazione, account bloccato) restano scritti qui finché non si
+            ritenta. Sono messaggi lunghi, non un generico "login failed".
+          -->
+          <div v-if="notice" class="login-notice" role="alert">
+            <ion-icon :icon="alertCircleOutline" aria-hidden="true" />
+            <p>{{ notice }}</p>
+          </div>
+
           <div class="forgot-password-container">
             <ion-button @click="handleForgotPassword" fill="clear" class="forgot-password-btn">
               Forgot Password?
@@ -70,12 +81,19 @@ import {
   IonPage, IonContent, IonList, IonItem, IonInput, IonIcon,
   IonButton, IonGrid, IonRow, IonCol, IonSpinner // MODIFIED: Imported IonSpinner
 } from '@ionic/vue';
-import { personOutline, keyOutline } from 'ionicons/icons';
+import { alertCircleOutline, personOutline, keyOutline } from 'ionicons/icons';
+import { apiErrorMessage } from '@/composables/useApi';
+
+/** Oltre questa lunghezza il messaggio non si legge in un toast breve. */
+const LONG_MESSAGE_LENGTH = 45;
+const LONG_TOAST_DURATION = 6000;
 
 const router = useRouter();
 const auth = useAuthStore();
 
 const isLoading = ref(false);
+/** Ultimo esito negativo del login, mostrato in pagina finché non si ritenta. */
+const notice = ref<string | null>(null);
 
 // Form data
 const email = ref('');
@@ -96,6 +114,7 @@ const handleLogin = async () => {
   }
 
   isLoading.value = true;
+  notice.value = null;
 
   try {
     await auth.login({ email: email.value, password: password.value });
@@ -104,8 +123,17 @@ const handleLogin = async () => {
     // cambiare la password di provisioning ci pensa il guard del router.
     router.push({ name: auth.isAdmin ? 'AdminDashboard' : 'Home' });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    presentToast(errorMessage, 'danger');
+    // Il backend risponde 200 anche quando l'accesso è negato: lo store rilancia
+    // il suo `message`, che qui è l'unica spiegazione disponibile (account in
+    // attesa di approvazione, bloccato, credenziali errate). Va mostrato
+    // integralmente, non sostituito da un testo generico.
+    const errorMessage = apiErrorMessage(error, 'An unknown error occurred');
+    notice.value = errorMessage;
+    presentToast(
+        errorMessage,
+        'danger',
+        errorMessage.length > LONG_MESSAGE_LENGTH ? LONG_TOAST_DURATION : undefined
+    );
   } finally {
     isLoading.value = false;
   }
@@ -145,6 +173,28 @@ const handleForgotPassword = () => {
 .form-wrapper {
   max-width: 450px;
   width: 100%;
+}
+.login-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface0);
+  border: 1px solid var(--peach);
+  text-align: start;
+}
+.login-notice ion-icon {
+  color: var(--peach);
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.login-notice p {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--subtext1);
+  line-height: 1.5;
 }
 .forgot-password-container {
   display: flex;

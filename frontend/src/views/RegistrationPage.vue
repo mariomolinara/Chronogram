@@ -1,7 +1,31 @@
 <template>
   <ion-page>
     <ion-content :fullscreen="true" class="ion-padding">
-      <div class="registration-container">
+      <!--
+        Esito "in attesa di approvazione": l'utente NON viene mandato al login,
+        dove verrebbe respinto. Resta su una schermata che dice cosa è successo
+        e cosa aspettarsi.
+      -->
+      <div v-if="pendingOutcome" class="registration-container">
+        <div class="registration-header">
+          <ion-icon :icon="mailUnreadOutline" class="header-icon" />
+          <h1 class="title-peach">Request sent</h1>
+        </div>
+
+        <div class="form-wrapper glass-card outcome-card" role="status" aria-live="polite">
+          <p class="outcome-message">{{ pendingOutcome }}</p>
+          <ul class="outcome-steps">
+            <li>Your account has been created but cannot sign in yet.</li>
+            <li>An administrator reviews the request and you receive an email with the decision.</li>
+            <li>After approval you sign in with the email and password you just chose.</li>
+          </ul>
+          <ion-button expand="block" class="pill-button gradient-outline" @click="goToLogin">
+            Back to sign in
+          </ion-button>
+        </div>
+      </div>
+
+      <div v-else class="registration-container">
         <div class="registration-header">
           <ion-icon :icon="personAddOutline" class="header-icon" />
           <h1 class="title-peach">Registration</h1>
@@ -196,13 +220,26 @@ import {
 import { useRouter } from 'vue-router';
 import {
   personAddOutline, eyeOutline, eyeOffOutline,
-  callOutline, mailOutline, personOutline,
+  callOutline, mailOutline, mailUnreadOutline, personOutline,
   keyOutline, calendarOutline, transgenderOutline,
   locationOutline
 } from 'ionicons/icons';
 import dayjs from 'dayjs';
-import { api } from '@/composables/useApi';
+import { api, apiErrorMessage } from '@/composables/useApi';
 import { useToast } from '@/composables/useToast';
+
+/**
+ * Esito della registrazione restituito dal backend in `data`: `ACTIVE` quando
+ * il dominio email è auto-approvato (vedi `RegistrationPolicy`), `PENDING`
+ * quando serve la decisione di un amministratore.
+ */
+type RegistrationOutcome = 'PENDING' | 'ACTIVE';
+
+interface RegisterResponse {
+  success: boolean;
+  message?: string;
+  data?: RegistrationOutcome;
+}
 
 /* ---------- costanti ---------- */
 /** Regola applicata da `isStrongPassword`: senza indicarla il pulsante Register
@@ -277,6 +314,16 @@ const onBirthdaySelected = (ev: CustomEvent<{ value?: string | string[] | null }
 };
 
 /* ---------- registration ---------- */
+
+/** Messaggio dell'esito in attesa di approvazione; null finché non accade. */
+const pendingOutcome = ref<string | null>(null);
+
+const goToLogin = () => router.push({ name: 'Login' });
+
+const PENDING_FALLBACK =
+    'Registration received. An administrator has to approve your account before you can '
+    + 'sign in; we will email you as soon as that happens.';
+
 async function handleRegister() {
   if (hasErrors.value) {
     showToast('Please correct the highlighted fields.', 'danger');
@@ -285,15 +332,20 @@ async function handleRegister() {
 
   isLoading.value = true;
   try {
-    const { data } = await api.post('/api/auth/register', { ...form });
+    const { data } = await api.post<RegisterResponse>('/api/auth/register', { ...form });
     if (!data?.success) throw new Error(data?.message ?? 'Unknown error');
+
+    // Il backend distingue i due esiti in `data`: un account PENDING non può
+    // ancora autenticarsi, quindi mandarlo al login sarebbe un vicolo cieco.
+    if (data.data === 'PENDING') {
+      pendingOutcome.value = data.message || PENDING_FALLBACK;
+      return;
+    }
 
     showToast(data.message || 'Registered successfully!', 'success');
     await router.push({ name: 'Login' });
-  } catch (err: any) {
-    console.error('Registration error:', err);
-    const message = err.response?.data?.message || err.message || 'Unexpected error';
-    showToast(message, 'danger');
+  } catch (err: unknown) {
+    showToast(apiErrorMessage(err, 'Unexpected error'), 'danger');
   } finally {
     isLoading.value = false;
   }
@@ -320,6 +372,28 @@ async function handleRegister() {
 .form-wrapper {
   max-width: 450px;
   width: 100%;
+}
+.outcome-card {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.outcome-message {
+  margin: 0;
+  font-size: var(--font-base);
+  line-height: 1.5;
+  color: var(--text);
+}
+.outcome-steps {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--subtext0);
+  line-height: 1.5;
 }
 ion-item.glass-input {
   --inner-padding-top: 4px;
