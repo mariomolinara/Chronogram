@@ -51,11 +51,22 @@ app.use(router);
 // ⿥ Imposta tema
 document.documentElement.setAttribute('data-theme', 'mocha');
 
-// ⿦ Esegui il mount dopo auth + interceptor
+// ⿦ Sessione e interceptor PRIMA del mount.
+//
+// L'ordine è vincolante, non stilistico. `app.mount()` monta la pagina della
+// rotta iniziale ed esegue i suoi `onMounted` in modo sincrono: le chiamate API
+// che partono lì dentro fotografano la catena di interceptor esistente in quel
+// momento. Registrandoli dopo il mount, la PRIMA richiesta di ogni avvio partiva
+// senza header `Authorization` e senza gestione del 401 — misurato sull'app
+// Android: `POST /api/activities/list auth=-` al lancio, `auth=Bearer ...` solo
+// dopo aver premuto "Retry". Restava nascosto finché l'avvio a freddo finiva
+// comunque sul login; da quando il guard di sessione porta un utente già
+// autenticato direttamente in Home, si vedeva a ogni lancio come "Couldn't load
+// your activities".
 router.isReady().then(async () => {
   const authStore = useAuthStore();
   await authStore.checkAuthStatus();
 
-  app.mount('#app');
   initApiInterceptors();
+  app.mount('#app');
 });

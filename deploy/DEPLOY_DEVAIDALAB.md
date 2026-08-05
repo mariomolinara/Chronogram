@@ -163,10 +163,82 @@ docker exec chronogram-mysql sh -c 'mysqldump --single-transaction -uroot -p"$MY
 ```bash
 cd /opt/chronogram
 docker compose -f docker-compose.prod.yml ps            # stato dei container
-docker compose -f docker-compose.prod.yml restart tomcat
+docker compose -f docker-compose.prod.yml restart tomcat  # solo se NON hai toccato chronogram.env
 docker compose -f docker-compose.prod.yml stop          # ferma tutto (dati salvi)
 docker compose -f docker-compose.prod.yml up -d         # riparte tutto
 ```
+
+### Dopo aver modificato `chronogram.env`: ricreare, non riavviare
+
+Le variabili di `env_file` vengono iniettate **alla creazione** del container, non
+al riavvio: dopo una modifica a `chronogram.env`, `docker compose restart tomcat`
+fa ripartire il container con i valori vecchi e la modifica sembra non avere
+effetto. Serve ricreare il solo container dell'app:
+
+```bash
+cd /opt/chronogram
+docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps tomcat
+```
+
+`--no-deps` lascia intatto il container mysql e `--force-recreate` ricrea solo
+tomcat: il volume `mysql-data` non viene toccato.
+
+### Runbook: correggere `LLM_DEFAULT_MODEL`
+
+L'id del modello deve combaciare **esattamente** (maiuscole e separatori) con uno
+di quelli abilitati per la chiave, altrimenti regolo.ai risponde 401 *"key not
+allowed to access model"*. Il deploy sostituisce solo il WAR e non tocca mai
+`chronogram.env`, quindi la correzione è manuale.
+
+**1. Correggere la riga**
+
+```bash
+sudo cp /opt/chronogram/chronogram.env /opt/chronogram/chronogram.env.bak
+sudo sed -i 's#^LLM_DEFAULT_MODEL=.*#LLM_DEFAULT_MODEL=Llama-3.3-70B-Instruct#' /opt/chronogram/chronogram.env
+sudo grep -E '^LLM_(DEFAULT_MODEL|API_URL)=' /opt/chronogram/chronogram.env
+```
+
+Atteso dall'ultimo comando, esattamente:
+
+```
+LLM_API_URL=https://api.regolo.ai/v1/chat/completions
+LLM_DEFAULT_MODEL=Llama-3.3-70B-Instruct
+```
+
+**2. Ricreare il solo container tomcat** (vedi la sezione qui sopra sul perché
+`restart` non basta)
+
+```bash
+cd /opt/chronogram
+sudo docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps tomcat
+```
+
+**3. Verificare**
+
+```bash
+# a) la variabile è davvero nel container
+sudo docker exec chronogram-tomcat printenv LLM_DEFAULT_MODEL   # -> Llama-3.3-70B-Instruct
+
+# b) l'app è ripartita
+curl -sS http://127.0.0.1:8800/chronogram/actuator/health       # -> {"status":"UP",...}
+
+# c) l'estrazione funziona (serve un account esistente: /api/llm/** richiede il token)
+TOKEN=$(curl -sS -X POST http://127.0.0.1:8800/chronogram/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"EMAIL","password":"PASSWORD"}' | sed 's/.*"token":"\([^"]*\)".*/\1/')
+curl -sS -o /tmp/r -w 'HTTP %{http_code}\n' -X POST \
+  http://127.0.0.1:8800/chronogram/api/llm/prompt \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"prompt":"corsa di 30 minuti al parco, gratis, mi ha fatto stare bene"}'; cat /tmp/r
+# atteso: HTTP 200 con campi valorizzati (es. "durationMins":30)
+# HTTP 502 = la chiamata al provider fallisce ancora -> punto (d)
+
+# d) diagnosi: status, corpo della risposta e id del modello sono nei log ERROR
+sudo docker logs --tail 200 chronogram-tomcat | grep 'LLM upstream failure'
+```
+
+La `LLM_API_KEY` non compare mai nei log (viaggia solo nell'header
+`Authorization`), quindi l'output del punto (d) si può incollare senza rischi.
 
 ---
 

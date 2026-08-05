@@ -81,9 +81,12 @@ describe('Sessione assente', () => {
     cy.visit('/login?redirect=https://phishing.example/login')
     signIn()
 
-    // Destinazione predefinita, non il sito esterno.
+    // Destinazione predefinita, non il sito esterno. L'invariante è "non siamo
+    // finiti fuori": si verifica sull'host di partenza, non su un host fisso,
+    // così la prova vale anche eseguita contro la produzione.
     cy.location('pathname').should('match', /\/home$/)
-    cy.location('hostname').should('eq', 'localhost')
+    cy.location('hostname').should('not.contain', 'phishing.example')
+    cy.location('origin').should('eq', new URL(Cypress.config('baseUrl') as string).origin)
   })
 
   it('manda al login anche un URL che non esiste', () => {

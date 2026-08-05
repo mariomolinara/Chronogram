@@ -42,7 +42,7 @@ describe('authStore.logout', () => {
    * post-logout andava in eccezione.
    */
   test('clears the session in memory and in storage, then returns to login', async () => {
-    const push = vi.spyOn(router, 'push').mockResolvedValue(undefined)
+    const replace = vi.spyOn(router, 'replace').mockResolvedValue(undefined)
     const store = useAuthStore()
 
     store.token = 'jwt-token'
@@ -56,7 +56,7 @@ describe('authStore.logout', () => {
     expect(store.isAuthenticated).toBe(false)
     expect(store.getToken()).toBeNull()
     expect((await Preferences.get({ key: 'authToken' })).value).toBeNull()
-    expect(push).toHaveBeenCalledWith({ name: 'Login' })
+    expect(replace).toHaveBeenCalledWith({ name: 'Login' })
   })
 
   /**
@@ -64,24 +64,24 @@ describe('authStore.logout', () => {
    * login deve poterci riportare, invece di scaricare l'utente sulla home.
    */
   test('conserva la pagina di provenienza quando le viene passata', async () => {
-    const push = vi.spyOn(router, 'push').mockResolvedValue(undefined)
+    const replace = vi.spyOn(router, 'replace').mockResolvedValue(undefined)
     const store = useAuthStore()
 
     await store.logout('/activity?id=12')
 
-    expect(push).toHaveBeenCalledWith({
+    expect(replace).toHaveBeenCalledWith({
       name: 'Login',
       query: { redirect: '/activity?id=12' }
     })
   })
 
   /**
-   * Un guard che ridirige fa rifiutare la promise di `push`: dentro un handler
+   * Un guard che ridirige fa rifiutare la promise di navigazione: dentro un handler
    * axios diventerebbe una unhandled rejection, e la sessione risulterebbe
    * chiusa a metà.
    */
   test('non propaga il fallimento della navigazione', async () => {
-    vi.spyOn(router, 'push').mockRejectedValue(new Error('Redirected from "/x" to "/y"'))
+    vi.spyOn(router, 'replace').mockRejectedValue(new Error('Redirected from "/x" to "/y"'))
     const store = useAuthStore()
     store.token = 'jwt-token'
     store.user = { username: 'mario@unicas.it', role: 'USER', mustChangePassword: false }
