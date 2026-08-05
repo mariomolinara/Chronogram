@@ -1,6 +1,7 @@
 package it.unicas.chronogram.domain;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -38,8 +39,20 @@ public class UserAuth {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
+    /**
+     * Derived from {@link #accountStatus} and never set on its own - see
+     * {@link #setStatus(AccountStatus)}. It stays the single flag consulted by
+     * the JWT filter and the password-reset flow, which is what makes blocking
+     * an account revoke the tokens already issued to it.
+     */
+    @Setter(AccessLevel.NONE)
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
+
+    @Setter(AccessLevel.NONE)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 20)
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
 
     @Column(name = "failed_login_attempts", nullable = false)
     private int failedLoginAttempts = 0;
@@ -62,6 +75,17 @@ public class UserAuth {
     /** Set while the account still uses the password it was provisioned with. */
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
+
+    /**
+     * The only way to change the lifecycle state. Keeping {@code is_active} in
+     * sync here - rather than at each call site - is what guarantees the two can
+     * never disagree, which would otherwise let a blocked account keep using a
+     * token it was issued before being blocked.
+     */
+    public void setStatus(AccountStatus status) {
+        this.accountStatus = status;
+        this.active = status.canAuthenticate();
+    }
 
     /** True if the account is currently within a lockout window. */
     public boolean isLocked(Instant now) {

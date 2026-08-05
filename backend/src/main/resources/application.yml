@@ -79,6 +79,14 @@ chronogram:
     # working once a new password is set from the admin page.
     email: ${ADMIN_EMAIL:}
     initial-password: ${ADMIN_INITIAL_PASSWORD:}
+  registration:
+    # Registrations from these email domains are approved automatically (sub-domains
+    # included, so unicas.it also covers studenti.unicas.it). Everyone else is
+    # created PENDING and needs an administrator to approve them. Comma-separated;
+    # leave empty to send every registration through manual approval.
+    auto-approve-domains: ${REGISTRATION_AUTO_APPROVE_DOMAINS:unicas.it}
+    # Email the administrator when a registration is waiting for a decision.
+    notify-admin: ${REGISTRATION_NOTIFY_ADMIN:true}
   stats:
     # Windows behind the dashboard metrics (see AdminService).
     active-window-days: ${STATS_ACTIVE_WINDOW_DAYS:10}

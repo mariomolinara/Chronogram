@@ -2,6 +2,7 @@ package it.unicas.chronogram.auth;
 
 import it.unicas.chronogram.auth.dto.*;
 import it.unicas.chronogram.common.ApiResponse;
+import it.unicas.chronogram.domain.AccountStatus;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,10 +22,19 @@ public class AuthController {
         this.passwordResetService = passwordResetService;
     }
 
+    /**
+     * The message differs by outcome: an auto-approved account can sign in at
+     * once, while a pending one must not be sent to the login form only to be
+     * turned away there.
+     */
     @PostMapping("/register")
-    public ApiResponse<Void> register(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
-        return ApiResponse.ok("Registration successful!");
+    public ApiResponse<String> register(@Valid @RequestBody RegisterRequest request) {
+        AccountStatus status = authService.register(request);
+        String message = status == AccountStatus.PENDING
+                ? "Registration received. An administrator has to approve your account before you can sign in; "
+                + "we will email you as soon as that happens."
+                : "Registration successful!";
+        return ApiResponse.ok(message, status.name());
     }
 
     @PostMapping("/login")

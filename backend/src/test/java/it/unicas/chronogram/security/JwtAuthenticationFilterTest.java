@@ -1,6 +1,7 @@
 package it.unicas.chronogram.security;
 
 import io.jsonwebtoken.JwtException;
+import it.unicas.chronogram.domain.AccountStatus;
 import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import jakarta.servlet.FilterChain;
@@ -47,7 +48,7 @@ class JwtAuthenticationFilterTest {
         UserAuth user = new UserAuth();
         user.setUserId(7);
         user.setEmail("ada@example.com");
-        user.setActive(true);
+        user.setStatus(AccountStatus.ACTIVE);
         return user;
     }
 
@@ -100,7 +101,7 @@ class JwtAuthenticationFilterTest {
     @Test
     void doesNotAuthenticateInactiveUser() throws Exception {
         UserAuth inactive = activeUser();
-        inactive.setActive(false);
+        inactive.setStatus(AccountStatus.BLOCKED);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer good-token");
         MockHttpServletResponse response = new MockHttpServletResponse();

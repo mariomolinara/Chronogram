@@ -88,6 +88,7 @@ Key variables in `.env`:
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` | SMTP settings (Gmail: use an App Password) |
 | `ADMIN_EMAIL`, `ADMIN_INITIAL_PASSWORD` | Built-in administrator, created on first boot (see [Admin area](#️-admin-area)) |
 | `STATS_ACTIVE_WINDOW_DAYS`, `STATS_REGULAR_WINDOW_DAYS`, `STATS_DISTRIBUTION_DAYS` | Dashboard metric windows (defaults 10 / 7 / 30) |
+| `REGISTRATION_AUTO_APPROVE_DOMAINS`, `REGISTRATION_NOTIFY_ADMIN` | Email domains admitted without approval (default `unicas.it`, sub-domains included) and whether the admin is emailed about pending requests (see [Registration approval](#registration-approval)) |
 
 > Save `.env` with **LF** (Unix) line endings.
 
@@ -193,6 +194,51 @@ The account is deliberately constrained:
 
 `ADMIN_INITIAL_PASSWORD` is only used at creation time — once the password is
 changed, the value in `.env` is inert and the account is never re-provisioned.
+
+### Registration approval
+
+Accounts have a lifecycle state (`user_auth.account_status`, added in `V4`):
+
+| State | Meaning |
+| --- | --- |
+| `PENDING` | registered, waiting for an administrator |
+| `ACTIVE` | can sign in normally |
+| `BLOCKED` | disabled by an administrator (reversible; data kept) |
+
+Registrations from a domain in `REGISTRATION_AUTO_APPROVE_DOMAINS` become `ACTIVE`
+immediately; every other address becomes `PENDING`, and both the applicant and the
+administrator are emailed. Matching is case-insensitive and covers sub-domains
+(`unicas.it` also admits `studenti.unicas.it`), but never look-alikes such as
+`notunicas.it`.
+
+At login the state is only revealed **after** the password has been verified —
+otherwise the form would tell anyone which addresses are registered. A correct
+password on a non-active account returns a specific message ("waiting for
+approval" / "blocked"); a wrong one returns the usual "Invalid credentials".
+
+`is_active` remains the derived "may authenticate" flag, kept in sync by
+`UserAuth.setStatus()`. That is what makes **blocking revoke tokens already
+issued**: the JWT filter rejects the account on the next request.
+
+### Managing participants
+
+`GET /api/admin/users` lists accounts with their state, registration date, last
+sign-in and how many activities they have logged, filterable by state and by a
+free-text term (email, name, surname) and paginated. Per-state totals travel with
+every page for the filter badges.
+
+| Action | Endpoint | Allowed from | Notification |
+| --- | --- | --- | --- |
+| Approve | `POST /api/admin/users/{id}/approve` | `PENDING` | optional note |
+| Block | `POST /api/admin/users/{id}/block` | `PENDING`, `ACTIVE` | optional note |
+| Unblock | `POST /api/admin/users/{id}/unblock` | `BLOCKED` | optional note |
+| Delete | `POST /api/admin/users/{id}/delete` | any | **message required** |
+
+Deletion is irreversible and cascades to the profile, activities, login history
+and any pending reset token; the message is mandatory precisely because of that.
+Administrators, the built-in system account and the caller's own account are
+never actionable from this list, so the back office cannot be locked out. A mail
+outage never rolls a decision back — it is logged and the action stands.
 
 ### Dashboard
 

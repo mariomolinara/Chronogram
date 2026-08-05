@@ -154,7 +154,7 @@ public class AdminService {
         CsvWriter csv = new CsvWriter(List.of(
                 "user_id", "email", "name", "surname", "phone", "gender", "birthday", "address",
                 "weekly_income", "weekly_income_other", "weekly_home_cost", "notes",
-                "registered_at", "last_login", "is_active"));
+                "registered_at", "last_login", "account_status"));
 
         for (UserAuth user : userAuthRepository.findAllByOrderByUserIdAsc()) {
             if (user.getRole() == Role.ADMIN) {
@@ -176,7 +176,7 @@ public class AdminService {
                     profile == null ? null : profile.getNotes(),
                     user.getCreatedAt(),
                     user.getLastLogin(),
-                    user.isActive());
+                    user.getAccountStatus());
         }
         return csv.toCsv();
     }

@@ -1,14 +1,21 @@
 package it.unicas.chronogram.repository;
 
+import it.unicas.chronogram.domain.AccountStatus;
 import it.unicas.chronogram.domain.Activity;
 import it.unicas.chronogram.domain.ActivityType;
 import it.unicas.chronogram.domain.PasswordResetToken;
+import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.domain.UserAuth;
+import it.unicas.chronogram.domain.UserProfile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -68,6 +75,7 @@ class RepositoryQueriesIntegrationTest {
     @MockBean private JavaMailSender mailSender;
 
     @Autowired private UserAuthRepository userAuthRepository;
+    @Autowired private UserProfileRepository userProfileRepository;
     @Autowired private ActivityRepository activityRepository;
     @Autowired private ActivityTypeRepository activityTypeRepository;
     @Autowired private PasswordResetTokenRepository tokenRepository;
@@ -76,7 +84,7 @@ class RepositoryQueriesIntegrationTest {
         UserAuth user = new UserAuth();
         user.setEmail(email);
         user.setPasswordHash("hash");
-        user.setActive(true);
+        user.setStatus(AccountStatus.ACTIVE);
         return userAuthRepository.saveAndFlush(user);
     }
 
@@ -111,6 +119,82 @@ class RepositoryQueriesIntegrationTest {
 
         assertThat(userAuthRepository.existsByEmailIgnoreCase("grace@example.com")).isTrue();
         assertThat(userAuthRepository.existsByEmailIgnoreCase("unknown@example.com")).isFalse();
+    }
+
+    /**
+     * The back-office search is the only query joining two entities that have no
+     * JPA association, and it takes nullable enum/String parameters that behave
+     * differently on a real MySQL than on an in-memory database - so it is
+     * verified here rather than trusted.
+     */
+    @Test
+    void searchFiltersByStatusAndFreeTextAndExcludesAdministrators() {
+        UserAuth pending = persistUser("pending@example.com");
+        pending.setStatus(AccountStatus.PENDING);
+        userAuthRepository.saveAndFlush(pending);
+
+        persistUser("active@example.com");
+
+        UserAuth admin = persistUser("boss@example.com");
+        admin.setRole(Role.ADMIN);
+        userAuthRepository.saveAndFlush(admin);
+
+        UserProfile profile = new UserProfile();
+        profile.setUserId(pending.getUserId());
+        profile.setName("Ada");
+        profile.setSurname("Lovelace");
+        userProfileRepository.saveAndFlush(profile);
+
+        Pageable firstPage = PageRequest.of(0, 25, Sort.by(Sort.Direction.DESC, "userId"));
+
+        // No filters at all: every participant, never an administrator.
+        Page<UserAuth> all = userAuthRepository.search(Role.ADMIN, null, null, firstPage);
+        assertThat(all.getContent()).extracting(UserAuth::getEmail)
+                .contains("pending@example.com", "active@example.com")
+                .doesNotContain("boss@example.com");
+
+        // By state.
+        Page<UserAuth> pendingOnly =
+                userAuthRepository.search(Role.ADMIN, AccountStatus.PENDING, null, firstPage);
+        assertThat(pendingOnly.getContent()).extracting(UserAuth::getEmail)
+                .containsExactly("pending@example.com");
+
+        // By a term that only the joined profile can satisfy.
+        Page<UserAuth> byName = userAuthRepository.search(Role.ADMIN, null, "%lovelace%", firstPage);
+        assertThat(byName.getContent()).extracting(UserAuth::getEmail)
+                .containsExactly("pending@example.com");
+
+        // By a term that only the email can satisfy.
+        Page<UserAuth> byEmail = userAuthRepository.search(Role.ADMIN, null, "%active@%", firstPage);
+        assertThat(byEmail.getContent()).extracting(UserAuth::getEmail)
+                .containsExactly("active@example.com");
+    }
+
+    @Test
+    void countByAccountStatusIgnoresAdministrators() {
+        UserAuth blocked = persistUser("blocked@example.com");
+        blocked.setStatus(AccountStatus.BLOCKED);
+        userAuthRepository.saveAndFlush(blocked);
+
+        UserAuth admin = persistUser("admin@example.com");
+        admin.setRole(Role.ADMIN);
+        admin.setStatus(AccountStatus.BLOCKED);
+        userAuthRepository.saveAndFlush(admin);
+
+        assertThat(userAuthRepository.countByAccountStatusAndRoleNot(AccountStatus.BLOCKED, Role.ADMIN))
+                .isEqualTo(1);
+    }
+
+    /** The V4 migration must leave existing rows usable, not silently pending. */
+    @Test
+    void anAccountDefaultsToActiveSoTheMigrationCannotLockAnyoneOut() {
+        UserAuth user = new UserAuth();
+        user.setEmail("legacy@example.com");
+        user.setPasswordHash("hash");
+        UserAuth saved = userAuthRepository.saveAndFlush(user);
+
+        assertThat(saved.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(saved.isActive()).isTrue();
     }
 
     // ---- ActivityTypeRepository (seeded by Flyway V2) ----
@@ -157,6 +241,31 @@ class RepositoryQueriesIntegrationTest {
         assertThat(activityRepository.findByIdAndUserId(activity.getId(), owner.getUserId())).isPresent();
         // Same id, wrong owner -> not returned.
         assertThat(activityRepository.findByIdAndUserId(activity.getId(), intruder.getUserId())).isEmpty();
+    }
+
+    /**
+     * Backs the per-user figures in the back-office list: one grouped query for a
+     * whole page instead of a count per row.
+     */
+    @Test
+    void summariseByUserIdsCountsAndDatesPerUser() {
+        ActivityType type = activityTypeRepository.findAllByOrderByNameAsc().get(0);
+        UserAuth busy = persistUser("busy@example.com");
+        UserAuth quiet = persistUser("quiet@example.com");
+        UserAuth idle = persistUser("idle@example.com");
+
+        persistActivity(busy.getUserId(), type, LocalDate.of(2026, 8, 1), LocalDateTime.of(2026, 8, 1, 9, 0));
+        persistActivity(busy.getUserId(), type, LocalDate.of(2026, 8, 4), LocalDateTime.of(2026, 8, 4, 9, 0));
+        persistActivity(quiet.getUserId(), type, LocalDate.of(2026, 7, 2), LocalDateTime.of(2026, 7, 2, 9, 0));
+
+        List<ActivityRepository.UserActivitySummary> summaries = activityRepository.summariseByUserIds(
+                List.of(busy.getUserId(), quiet.getUserId(), idle.getUserId()));
+
+        assertThat(summaries).hasSize(2); // the idle user simply has no row
+        ActivityRepository.UserActivitySummary busySummary = summaries.stream()
+                .filter(s -> s.getUserId().equals(busy.getUserId())).findFirst().orElseThrow();
+        assertThat(busySummary.getTotal()).isEqualTo(2);
+        assertThat(busySummary.getLastDay()).isEqualTo(LocalDate.of(2026, 8, 4));
     }
 
     // ---- PasswordResetTokenRepository ----

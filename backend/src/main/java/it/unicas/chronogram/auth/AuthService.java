@@ -3,10 +3,13 @@ package it.unicas.chronogram.auth;
 import it.unicas.chronogram.auth.dto.LoginResponse;
 import it.unicas.chronogram.auth.dto.RegisterRequest;
 import it.unicas.chronogram.common.exception.ApiExceptions.EmailAlreadyExistsException;
+import it.unicas.chronogram.config.ChronogramProperties;
+import it.unicas.chronogram.domain.AccountStatus;
 import it.unicas.chronogram.domain.LoginEvent;
 import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.domain.UserProfile;
+import it.unicas.chronogram.mail.EmailService;
 import it.unicas.chronogram.repository.LoginEventRepository;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import it.unicas.chronogram.repository.UserProfileRepository;
@@ -39,33 +42,48 @@ public class AuthService {
     private final LoginEventRepository loginEventRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final RegistrationPolicy registrationPolicy;
+    private final EmailService emailService;
+    private final ChronogramProperties properties;
 
     public AuthService(UserAuthRepository userAuthRepository,
                        UserProfileRepository userProfileRepository,
                        LoginEventRepository loginEventRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       RegistrationPolicy registrationPolicy,
+                       EmailService emailService,
+                       ChronogramProperties properties) {
         this.userAuthRepository = userAuthRepository;
         this.userProfileRepository = userProfileRepository;
         this.loginEventRepository = loginEventRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.registrationPolicy = registrationPolicy;
+        this.emailService = emailService;
+        this.properties = properties;
     }
 
+    /**
+     * Creates the account and returns the state it was created in, so the
+     * endpoint can tell the applicant whether they can sign in right away or
+     * have to wait for an administrator.
+     */
     @Transactional
-    public void register(RegisterRequest request) {
+    public AccountStatus register(RegisterRequest request) {
         if (userAuthRepository.existsByEmailIgnoreCase(request.email())) {
             throw new EmailAlreadyExistsException("Email already registered.");
         }
 
         LocalDateTime now = LocalDateTime.now();
+        AccountStatus status = registrationPolicy.statusFor(request.email());
 
         UserAuth auth = new UserAuth();
         auth.setEmail(request.email());
         auth.setPasswordHash(passwordEncoder.encode(request.password()));
         auth.setCreatedAt(now);
         auth.setUpdatedAt(now);
-        auth.setActive(true);
+        auth.setStatus(status);
         UserAuth savedAuth = userAuthRepository.save(auth);
 
         UserProfile profile = new UserProfile();
@@ -80,20 +98,54 @@ public class AuthService {
         profile.setUpdatedAt(now);
         userProfileRepository.save(profile);
 
-        log.info("User {} registered successfully with user_id={}", request.email(), savedAuth.getUserId());
+        log.info("User {} registered with user_id={} and status {}",
+                request.email(), savedAuth.getUserId(), status);
+
+        if (status == AccountStatus.PENDING) {
+            // The address comes from the request, not from the entity returned by
+            // save(): the latter is only guaranteed to carry the generated id.
+            notifyPendingRegistration(request.email(), profile.getName());
+        }
+        return status;
     }
 
     /**
-     * Authenticates a user. Business failures (bad credentials, locked account)
-     * are returned as an unsuccessful {@link LoginResponse} rather than thrown,
-     * so the endpoint always responds 200 and the client handles the outcome.
+     * Best-effort notifications around a registration awaiting approval: the
+     * applicant learns why they cannot sign in yet, the administrator learns
+     * somebody is waiting. A mail outage must not undo a completed registration,
+     * so failures are logged and swallowed.
+     */
+    private void notifyPendingRegistration(String applicantEmail, String applicantName) {
+        try {
+            emailService.sendRegistrationPendingEmail(applicantEmail);
+        } catch (RuntimeException e) {
+            log.error("Could not send the pending-registration email to {}", applicantEmail, e);
+        }
+
+        if (!properties.getRegistration().isNotifyAdmin()) {
+            return;
+        }
+        userAuthRepository.findFirstBySystemAccountTrue().ifPresent(admin -> {
+            try {
+                emailService.sendPendingRegistrationNotice(admin.getEmail(), applicantEmail, applicantName);
+            } catch (RuntimeException e) {
+                log.error("Could not notify the administrator about {}", applicantEmail, e);
+            }
+        });
+    }
+
+    /**
+     * Authenticates a user. Business failures (bad credentials, locked account,
+     * account not approved) are returned as an unsuccessful {@link LoginResponse}
+     * rather than thrown, so the endpoint always responds 200 and the client
+     * handles the outcome.
      */
     @Transactional
     public LoginResponse login(String email, String rawPassword) {
         UserAuth user = userAuthRepository.findByEmailIgnoreCase(email).orElse(null);
 
-        if (user == null || !user.isActive()) {
-            log.warn("Login attempt for non-existent or inactive user: {}", email);
+        if (user == null) {
+            log.warn("Login attempt for non-existent user: {}", email);
             return LoginResponse.failure("Invalid credentials.");
         }
 
@@ -104,6 +156,17 @@ public class AuthService {
         }
 
         if (passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
+            // Only now that the password is proven correct may the account state be
+            // disclosed: telling an anonymous caller "this one is awaiting approval"
+            // before that would turn the login form into an account-enumeration oracle.
+            AccountStatus status = user.getAccountStatus() == null
+                    ? AccountStatus.ACTIVE
+                    : user.getAccountStatus();
+            if (!status.canAuthenticate()) {
+                log.warn("Login refused for {}: account status is {}", email, status);
+                return LoginResponse.failure(messageFor(status));
+            }
+
             user.setFailedLoginAttempts(0);
             user.setLockedUntil(null);
             user.setLastLogin(now);
@@ -132,6 +195,16 @@ public class AuthService {
         userAuthRepository.save(user);
         log.warn("Wrong password for {}", email);
         return LoginResponse.failure(message);
+    }
+
+    /** What a user whose credentials are correct but whose account is not usable is told. */
+    private static String messageFor(AccountStatus status) {
+        return switch (status) {
+            case PENDING -> "Your account is waiting for administrator approval. "
+                    + "You will receive an email once it has been reviewed.";
+            case BLOCKED -> "Your account has been blocked. Please contact the administrator.";
+            case ACTIVE -> "Invalid credentials.";
+        };
     }
 
     private LocalDate parseBirthday(String value) {

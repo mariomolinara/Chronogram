@@ -1,6 +1,7 @@
 package it.unicas.chronogram.admin;
 
 import it.unicas.chronogram.config.ChronogramProperties;
+import it.unicas.chronogram.domain.AccountStatus;
 import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.domain.UserProfile;
@@ -82,7 +83,7 @@ class AdminAccountInitializerTest {
         existing.setEmail("changed@example.com");
         existing.setRole(Role.ADMIN);
         existing.setSystemAccount(true);
-        existing.setActive(true);
+        existing.setStatus(AccountStatus.ACTIVE);
         when(userAuthRepository.findFirstBySystemAccountTrue()).thenReturn(Optional.of(existing));
 
         initializer.run(null);
@@ -98,7 +99,7 @@ class AdminAccountInitializerTest {
         tampered.setEmail("admin@example.com");
         tampered.setRole(Role.USER);
         tampered.setSystemAccount(true);
-        tampered.setActive(false);
+        tampered.setStatus(AccountStatus.BLOCKED);
         when(userAuthRepository.findFirstBySystemAccountTrue()).thenReturn(Optional.of(tampered));
 
         initializer.run(null);

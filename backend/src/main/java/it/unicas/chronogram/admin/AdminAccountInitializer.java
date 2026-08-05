@@ -1,6 +1,7 @@
 package it.unicas.chronogram.admin;
 
 import it.unicas.chronogram.config.ChronogramProperties;
+import it.unicas.chronogram.domain.AccountStatus;
 import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.domain.UserProfile;
@@ -88,7 +89,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
         admin.setRole(Role.ADMIN);
         admin.setSystemAccount(true);
         admin.setMustChangePassword(true);
-        admin.setActive(true);
+        admin.setStatus(AccountStatus.ACTIVE);
         admin.setCreatedAt(now);
         admin.setUpdatedAt(now);
         UserAuth saved = userAuthRepository.save(admin);
@@ -118,8 +119,8 @@ public class AdminAccountInitializer implements ApplicationRunner {
             admin.setRole(Role.ADMIN);
             changed = true;
         }
-        if (!admin.isActive()) {
-            admin.setActive(true);
+        if (admin.getAccountStatus() != AccountStatus.ACTIVE) {
+            admin.setStatus(AccountStatus.ACTIVE);
             changed = true;
         }
         if (changed) {

@@ -30,6 +30,9 @@ public class ChronogramProperties {
     @NestedConfigurationProperty
     private Stats stats = new Stats();
 
+    @NestedConfigurationProperty
+    private Registration registration = new Registration();
+
     @Getter
     @Setter
     public static class Security {
@@ -97,6 +100,26 @@ public class ChronogramProperties {
          * so this value stops working as soon as the admin picks a new one.
          */
         private String initialPassword;
+    }
+
+    /** Who gets in without waiting for an administrator. */
+    @Getter
+    @Setter
+    public static class Registration {
+        /**
+         * Email domains whose registrations are approved automatically. Everyone
+         * else is created PENDING and needs an administrator to approve them.
+         * Matching is case-insensitive and covers sub-domains, so {@code unicas.it}
+         * also admits {@code studenti.unicas.it}. An empty list sends every new
+         * registration through manual approval.
+         */
+        private List<String> autoApproveDomains = List.of("unicas.it");
+        /**
+         * Whether the administrator is emailed when a registration needs a
+         * decision. Without it a pending request is only visible to someone who
+         * happens to open the back office.
+         */
+        private boolean notifyAdmin = true;
     }
 
     /** Windows behind the admin dashboard metrics. */

@@ -5,6 +5,7 @@ import it.unicas.chronogram.auth.dto.LoginResponse;
 import it.unicas.chronogram.common.GlobalExceptionHandler;
 import it.unicas.chronogram.common.exception.ApiExceptions.EmailAlreadyExistsException;
 import it.unicas.chronogram.common.exception.ApiExceptions.ValidationException;
+import it.unicas.chronogram.domain.AccountStatus;
 import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import it.unicas.chronogram.security.JwtService;
@@ -65,13 +66,31 @@ class AuthControllerTest {
 
     @Test
     void registerReturnsOkEnvelope() throws Exception {
-        doNothing().when(authService).register(any());
+        when(authService.register(any())).thenReturn(AccountStatus.ACTIVE);
 
         mockMvc.perform(post("/api/auth/register").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(json(validRegisterBody())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value("ACTIVE"))
                 .andExpect(jsonPath("$.message").value("Registration successful!"));
+    }
+
+    /**
+     * A pending registration must not be told it can sign in: the client needs a
+     * different message and the status to branch on.
+     */
+    @Test
+    void registerAnnouncesThatApprovalIsPending() throws Exception {
+        when(authService.register(any())).thenReturn(AccountStatus.PENDING);
+
+        mockMvc.perform(post("/api/auth/register").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(json(validRegisterBody())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value("PENDING"))
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("administrator has to approve")));
     }
 
     @Test

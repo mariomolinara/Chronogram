@@ -3,6 +3,7 @@ package it.unicas.chronogram.auth;
 import it.unicas.chronogram.common.exception.ApiExceptions.ServiceException;
 import it.unicas.chronogram.common.exception.ApiExceptions.ValidationException;
 import it.unicas.chronogram.config.ChronogramProperties;
+import it.unicas.chronogram.domain.AccountStatus;
 import it.unicas.chronogram.domain.PasswordResetToken;
 import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.mail.EmailService;
@@ -58,7 +59,7 @@ class PasswordResetServiceTest {
         UserAuth user = new UserAuth();
         user.setUserId(11);
         user.setEmail("ada@example.com");
-        user.setActive(true);
+        user.setStatus(AccountStatus.ACTIVE);
         return user;
     }
 
@@ -188,7 +189,7 @@ class PasswordResetServiceTest {
     @Test
     void initiateSilentlyDoesNothingForInactiveUser() {
         UserAuth user = activeUser();
-        user.setActive(false);
+        user.setStatus(AccountStatus.BLOCKED);
         when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
 
         service.initiatePasswordReset("ada@example.com");

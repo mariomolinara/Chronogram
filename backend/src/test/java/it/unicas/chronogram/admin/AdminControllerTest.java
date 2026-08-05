@@ -2,7 +2,10 @@ package it.unicas.chronogram.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.unicas.chronogram.admin.dto.AdminStatsResponse;
+import it.unicas.chronogram.admin.dto.AdminUserPageResponse;
+import it.unicas.chronogram.admin.dto.AdminUserResponse;
 import it.unicas.chronogram.common.GlobalExceptionHandler;
+import it.unicas.chronogram.domain.AccountStatus;
 import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.repository.UserAuthRepository;
 import it.unicas.chronogram.security.AuthPrincipal;
@@ -19,11 +22,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -48,6 +54,7 @@ class AdminControllerTest {
     @Autowired private ObjectMapper objectMapper;
 
     @MockBean private AdminService adminService;
+    @MockBean private AdminUserService adminUserService;
     // Required by the auto-registered JwtAuthenticationFilter (a @Component).
     @MockBean private JwtService jwtService;
     @MockBean private UserAuthRepository userAuthRepository;
@@ -126,5 +133,93 @@ class AdminControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ---- participants ----
+
+    private AdminUserResponse participant(AccountStatus status) {
+        return new AdminUserResponse(7, "ada@example.com", "Ada", "Lovelace", status,
+                LocalDateTime.of(2026, 8, 1, 9, 0), null, 12, LocalDate.of(2026, 8, 4));
+    }
+
+    @Test
+    void theUserListBindsItsFiltersAndReturnsTheCounts() throws Exception {
+        AdminUserPageResponse page = new AdminUserPageResponse(
+                List.of(participant(AccountStatus.PENDING)), 0, 25, 1, 1,
+                new AdminUserPageResponse.StatusCounts(3, 20, 1));
+        when(adminUserService.list(eq(AccountStatus.PENDING), eq("ada"), eq(0), eq(25))).thenReturn(page);
+
+        mockMvc.perform(get("/api/admin/users")
+                        .param("status", "PENDING").param("query", "ada")
+                        .param("page", "0").param("size", "25")
+                        .with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.items[0].email").value("ada@example.com"))
+                .andExpect(jsonPath("$.data.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.data.items[0].activityCount").value(12))
+                .andExpect(jsonPath("$.data.counts.pending").value(3));
+    }
+
+    @Test
+    void theUserListWorksWithNoFiltersAtAll() throws Exception {
+        when(adminUserService.list(eq(null), eq(null), eq(null), eq(null)))
+                .thenReturn(new AdminUserPageResponse(List.of(), 0, 25, 0, 0,
+                        new AdminUserPageResponse.StatusCounts(0, 0, 0)));
+
+        mockMvc.perform(get("/api/admin/users").with(authentication(admin())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray());
+    }
+
+    /** The acting administrator comes from the token, never from the payload. */
+    @Test
+    void approveUsesTheAuthenticatedAdministratorId() throws Exception {
+        when(adminUserService.approve(eq(1), eq(7), eq("Welcome")))
+                .thenReturn(participant(AccountStatus.ACTIVE));
+
+        mockMvc.perform(post("/api/admin/users/7/approve").with(authentication(admin())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("message", "Welcome"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+    }
+
+    /** The note is optional on the reversible actions, so no body must still work. */
+    @Test
+    void blockAcceptsAnAbsentBody() throws Exception {
+        when(adminUserService.block(eq(1), eq(7), eq(null)))
+                .thenReturn(participant(AccountStatus.BLOCKED));
+
+        mockMvc.perform(post("/api/admin/users/7/block").with(authentication(admin())).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("BLOCKED"));
+    }
+
+    /**
+     * Deletion is irreversible, so the explanation sent to the user is mandatory
+     * and the request is rejected before anything is removed.
+     */
+    @Test
+    void deleteRequiresAMessageForTheUser() throws Exception {
+        mockMvc.perform(post("/api/admin/users/7/delete").with(authentication(admin())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("message", "   "))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+
+        verify(adminUserService, never()).delete(any(), any(), any());
+    }
+
+    @Test
+    void deletePassesTheMessageThrough() throws Exception {
+        mockMvc.perform(post("/api/admin/users/7/delete").with(authentication(admin())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("message", "Withdrawn"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(adminUserService).delete(1, 7, "Withdrawn");
     }
 }
