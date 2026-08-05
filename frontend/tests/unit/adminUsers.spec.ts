@@ -212,6 +212,33 @@ describe('useAdminUsers - azioni', () => {
     expect(store.actionInProgress.value).toBeNull()
   })
 
+  /**
+   * Rifiutare è bloccare un account ancora PENDING: il backend non espone un
+   * endpoint `reject`, quindi l'azione della UI deve finire su `block` — senza
+   * di che partirebbe una POST verso una rotta inesistente.
+   */
+  test('reject di una richiesta in attesa chiama l endpoint block', async () => {
+    get.mockResolvedValue(envelope(page()))
+    const store = admin()
+    post.mockResolvedValue({ data: { success: true, message: 'Account blocked.' } })
+
+    const outcome = await store.runAction(user(), 'reject', ' Domain not eligible ')
+
+    expect(post).toHaveBeenCalledWith('/api/admin/users/7/block', { message: 'Domain not eligible' })
+    expect(outcome).toEqual({ ok: true, message: 'Account blocked.' })
+  })
+
+  test('reject senza messaggio parte comunque: il testo è facoltativo', async () => {
+    get.mockResolvedValue(envelope(page()))
+    const store = admin()
+    post.mockResolvedValue({ data: { success: true, message: 'Account blocked.' } })
+
+    const outcome = await store.runAction(user(), 'reject', '')
+
+    expect(post).toHaveBeenCalledWith('/api/admin/users/7/block', { message: null })
+    expect(outcome.ok).toBe(true)
+  })
+
   test('un messaggio vuoto resta null per le azioni facoltative', async () => {
     get.mockResolvedValue(envelope(page()))
     const store = admin()

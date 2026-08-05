@@ -16,7 +16,9 @@
 
         <!-- ── Coda delle richieste in attesa ───────────────────────── -->
         <!-- PENDING è l'unico stato che richiede una decisione: sta in testa
-             alla pagina e resta visibile finché la coda non è vuota. -->
+             alla pagina e resta visibile finché la coda non è vuota. La barra
+             d'accento e il fondo appena tinto la fanno leggere come "da fare"
+             prima ancora di leggerne il testo. -->
         <section
             v-if="counts.pending > 0"
             class="glass-card pending-banner"
@@ -35,12 +37,16 @@
           </div>
           <ion-button
               v-if="status !== 'PENDING'"
-              fill="outline"
               size="small"
+              class="pending-cta"
               @click="setStatus('PENDING')"
           >
             Review them
           </ion-button>
+          <p v-else class="pending-current" role="status">
+            <ion-icon :icon="checkmarkCircleOutline" aria-hidden="true" />
+            You are looking at the queue
+          </p>
         </section>
 
         <!-- ── Filtri ───────────────────────────────────────────────── -->
@@ -66,30 +72,58 @@
               aria-label="Filter by account status"
               @ionChange="onStatusChange"
           >
-            <ion-segment-button v-for="option in statusOptions" :key="option.value" :value="option.value">
+            <ion-segment-button
+                v-for="option in statusOptions"
+                :key="option.value"
+                :value="option.value"
+                :aria-label="`${option.label}: ${option.count} ${option.count === 1 ? 'account' : 'accounts'}`"
+            >
               <ion-label>
                 {{ option.label }}
-                <span class="segment-count">{{ option.count }}</span>
+                <span
+                    class="segment-count"
+                    :class="{ 'segment-count--alert': option.value === 'PENDING' && option.count > 0 }"
+                    aria-hidden="true"
+                >{{ option.count }}</span>
               </ion-label>
             </ion-segment-button>
           </ion-segment>
         </section>
 
         <!-- ── Stati della lista ────────────────────────────────────── -->
-        <div v-if="loading" class="state-block" role="status" aria-live="polite">
-          <ion-spinner name="crescent" />
-          <p>Loading participants…</p>
+        <!--
+          Lo scheletro tiene la stessa griglia delle righe reali: al termine del
+          caricamento la pagina non salta e l'occhio resta dov'era.
+        -->
+        <div v-if="loading" class="loading-block">
+          <p class="sr-only" role="status" aria-live="polite">Loading participants…</p>
+          <ul class="user-list" aria-hidden="true">
+            <li v-for="placeholder in 3" :key="placeholder" class="glass-card user-row user-row--skeleton">
+              <div class="user-identity">
+                <ion-skeleton-text :animated="true" style="width: 55%; height: 1rem" />
+                <ion-skeleton-text :animated="true" style="width: 75%; height: 0.8rem" />
+              </div>
+              <ion-skeleton-text :animated="true" class="skeleton-chip" />
+              <div class="skeleton-meta">
+                <ion-skeleton-text v-for="cell in 4" :key="cell" :animated="true" style="height: 1.6rem" />
+              </div>
+            </li>
+          </ul>
         </div>
 
-        <div v-else-if="error" class="state-block" role="alert">
+        <div v-else-if="error" class="state-block state-block--error" role="alert">
           <ion-icon :icon="alertCircleOutline" />
           <p>{{ error }}</p>
-          <ion-button fill="outline" size="small" @click="load">Retry</ion-button>
+          <ion-button fill="outline" size="small" @click="load">
+            <ion-icon slot="start" :icon="refreshOutline" aria-hidden="true" />
+            Retry
+          </ion-button>
         </div>
 
         <div v-else-if="items.length === 0" class="state-block" role="status" aria-live="polite">
-          <ion-icon :icon="peopleOutline" />
+          <ion-icon :icon="hasFilters ? searchOutline : peopleOutline" />
           <p>{{ emptyMessage }}</p>
+          <p v-if="hasFilters" class="state-hint">Try a different term, or show every account.</p>
           <ion-button v-if="hasFilters" fill="outline" size="small" @click="clearFilters">
             Clear filters
           </ion-button>
@@ -103,13 +137,23 @@
           </p>
 
           <ul class="user-list">
-            <li v-for="user in items" :key="user.userId" class="glass-card user-row">
+            <li
+                v-for="user in items"
+                :key="user.userId"
+                class="glass-card user-row"
+                :class="[`user-row--${user.status.toLowerCase()}`, { 'user-row--busy': actionInProgress === user.userId }]"
+            >
               <div class="user-identity">
                 <p class="user-name">{{ fullName(user) }}</p>
                 <p class="user-email">{{ user.email }}</p>
               </div>
 
+              <!--
+                Lo stato non è affidato al solo colore: icona + parola restano
+                leggibili in bianco e nero e per chi non distingue peach da verde.
+              -->
               <span class="status-chip" :class="`status-chip--${user.status.toLowerCase()}`">
+                <ion-icon :icon="statusIcon(user.status)" aria-hidden="true" />
                 {{ statusLabel(user.status) }}
               </span>
 
@@ -134,17 +178,17 @@
 
               <!--
                 Le azioni dipendono dallo stato, come le regole del servizio:
-                approve solo da PENDING, unblock solo da BLOCKED. Gli account
-                amministratore (compreso il proprio e quello di sistema) non
-                compaiono affatto in questa lista: il backend li esclude dalla
-                query, quindi ogni riga qui è azionabile.
+                approve/reject solo da PENDING, unblock solo da BLOCKED. Gli
+                account amministratore (compreso il proprio e quello di sistema)
+                non compaiono affatto in questa lista: il backend li esclude
+                dalla query, quindi ogni riga qui è azionabile.
               -->
               <div class="user-actions">
                 <ion-button
                     v-for="action in actionsFor(user.status)"
                     :key="action"
                     size="small"
-                    :fill="action === 'delete' ? 'clear' : 'outline'"
+                    :fill="actionFill(action)"
                     :color="actionColor(action)"
                     :disabled="actionInProgress !== null"
                     :aria-label="`${actionLabel(action)} ${user.email}`"
@@ -153,6 +197,12 @@
                   <ion-icon slot="start" :icon="actionIcon(action)" aria-hidden="true" />
                   {{ actionLabel(action) }}
                 </ion-button>
+                <ion-spinner
+                    v-if="actionInProgress === user.userId"
+                    name="crescent"
+                    class="row-spinner"
+                    aria-label="Applying the change"
+                />
               </div>
             </li>
           </ul>
@@ -221,7 +271,15 @@
               <strong>The operation cannot be undone.</strong>
             </p>
           </div>
-          <p v-else class="confirm-explanation">{{ dialogExplanation }}</p>
+          <template v-else>
+            <p class="confirm-explanation">{{ dialogExplanation }}</p>
+            <!-- Reversibilità dichiarata: la differenza fra Reject e Delete è
+                 tutta qui, e va detta prima di premere, non dopo. -->
+            <p v-if="dialogReversible" class="confirm-reversible">
+              <ion-icon :icon="refreshOutline" aria-hidden="true" />
+              {{ dialogReversible }}
+            </p>
+          </template>
 
           <div class="message-field">
             <label class="message-label" for="admin-message">
@@ -265,7 +323,7 @@
           <div class="confirm-actions">
             <ion-button fill="outline" :disabled="submitting" @click="closeDialog">Cancel</ion-button>
             <ion-button
-                :color="dialog.action === 'delete' ? 'danger' : 'primary'"
+                :color="confirmColor"
                 :disabled="submitting || (messageRequired && !trimmedMessage)"
                 @click="confirm"
             >
@@ -284,12 +342,13 @@ import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonButton,
   IonIcon, IonSpinner, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
-  IonModal, IonTextarea
+  IonModal, IonTextarea, IonSkeletonText
 } from '@ionic/vue';
 import {
   alertCircleOutline, arrowBackOutline, banOutline, checkmarkCircleOutline,
-  chevronBackOutline, chevronForwardOutline, hourglassOutline, lockOpenOutline,
-  mailOutline, peopleOutline, trashOutline, warningOutline
+  chevronBackOutline, chevronForwardOutline, closeCircleOutline, hourglassOutline,
+  lockClosedOutline, lockOpenOutline, mailOutline, peopleOutline, refreshOutline,
+  searchOutline, trashOutline, warningOutline
 } from 'ionicons/icons';
 import { useToast } from '@/composables/useToast';
 import {
@@ -367,6 +426,13 @@ const statusLabel = (value: AccountStatus): string => ({
   BLOCKED: 'Blocked'
 }[value]);
 
+/** Seconda codifica dello stato accanto alla parola: mai il solo colore. */
+const statusIcon = (value: AccountStatus): string => ({
+  PENDING: hourglassOutline,
+  ACTIVE: checkmarkCircleOutline,
+  BLOCKED: lockClosedOutline
+}[value]);
+
 /**
  * Le date arrivano come ISO locali senza offset. Vengono ricomposte a mano
  * invece di passare da `Date`: `new Date('2026-08-05')` è interpretata in UTC e
@@ -389,14 +455,20 @@ function formatDateTime(value: string | null): string {
   return time ? `${day}, ${time}` : day;
 }
 
+/**
+ * Su una richiesta in attesa il rifiuto sta accanto all'approvazione: le due
+ * decisioni sono simmetriche e devono costare lo stesso numero di gesti.
+ * `Delete` resta l'ultima e la più leggera visivamente, per non invitarla.
+ */
 const actionsFor = (state: AccountStatus): AdminUserAction[] => ({
-  PENDING: ['approve', 'delete'] as AdminUserAction[],
+  PENDING: ['approve', 'reject', 'delete'] as AdminUserAction[],
   ACTIVE: ['block', 'delete'] as AdminUserAction[],
   BLOCKED: ['unblock', 'delete'] as AdminUserAction[]
 }[state]);
 
 const actionLabel = (action: AdminUserAction): string => ({
   approve: 'Approve',
+  reject: 'Reject',
   block: 'Block',
   unblock: 'Unblock',
   delete: 'Delete'
@@ -404,13 +476,19 @@ const actionLabel = (action: AdminUserAction): string => ({
 
 const actionColor = (action: AdminUserAction): string => ({
   approve: 'success',
+  reject: 'warning',
   block: 'warning',
   unblock: 'success',
   delete: 'danger'
 }[action]);
 
+/** Solo `delete` è senza bordo: pesa meno di ogni altra azione della riga. */
+const actionFill = (action: AdminUserAction): 'clear' | 'outline' =>
+    (action === 'delete' ? 'clear' : 'outline');
+
 const actionIcon = (action: AdminUserAction): string => ({
   approve: checkmarkCircleOutline,
+  reject: closeCircleOutline,
   block: banOutline,
   unblock: lockOpenOutline,
   delete: trashOutline
@@ -422,6 +500,7 @@ const dialogTitle = computed(() => {
   }
   return {
     approve: 'Approve this registration?',
+    reject: 'Reject this registration?',
     block: 'Block this account?',
     unblock: 'Unblock this account?',
     delete: 'Delete this account for good?'
@@ -434,26 +513,59 @@ const dialogExplanation = computed(() => {
   }
   return {
     approve: 'The account will be able to sign in immediately.',
+    reject: 'The request is turned down: the person is notified by email and will not be able '
+        + 'to sign in. Nothing is deleted — the account stays in the list as blocked.',
     block: 'The person will no longer be able to sign in. Their data is kept and the block can be lifted later.',
     unblock: 'The person will be able to sign in again.',
     delete: ''
   }[dialog.value.action];
 });
 
+/** Rassicurazione esplicita sulle azioni che si possono disfare. */
+const dialogReversible = computed(() => {
+  if (!dialog.value) {
+    return '';
+  }
+  return {
+    approve: '',
+    reject: 'You can change your mind later: unblock the account from the Blocked filter.',
+    block: '',
+    unblock: '',
+    delete: ''
+  }[dialog.value.action];
+});
+
+const confirmColor = computed(() => {
+  if (!dialog.value) {
+    return 'primary';
+  }
+  return { approve: 'primary', reject: 'warning', block: 'warning', unblock: 'primary', delete: 'danger' }[
+      dialog.value.action
+  ];
+});
+
 const confirmLabel = computed(() =>
     dialog.value ? actionLabel(dialog.value.action) : ''
 );
 
-const messagePlaceholder = computed(() =>
-    messageRequired.value
-        ? 'Explain why the account and its data are being removed'
-        : 'Add a note to the standard notice, or leave empty'
-);
+const messagePlaceholder = computed(() => {
+  if (messageRequired.value) {
+    return 'Explain why the account and its data are being removed';
+  }
+  if (dialog.value?.action === 'reject') {
+    return 'Say why the request was turned down — this is the only explanation the person gets';
+  }
+  return 'Add a note to the standard notice, or leave empty';
+});
 
 /**
  * Anteprima fedele di ciò che parte via email. I testi rispecchiano
  * `EmailService.sendAccountApprovedEmail/Blocked/Deleted`: vanno tenuti
  * allineati se le mail cambiano lato backend.
+ *
+ * `reject` passa da `AdminUserService.block`, quindi riceve esattamente la
+ * mail di blocco: l'anteprima è la stessa, e per questo il messaggio libero
+ * è l'unico posto dove spiegare che si trattava di un rifiuto.
  */
 const emailPreview = computed<{ subject: string; body: string[] }>(() => {
   if (!dialog.value) {
@@ -472,6 +584,14 @@ const emailPreview = computed<{ subject: string; body: string[] }>(() => {
       body: [
         'Your Chronogram account has been approved. You can now sign in with the email '
         + 'and password you chose when you registered.'
+      ]
+    },
+    reject: {
+      subject: 'Your account has been blocked - Chronogram',
+      body: [
+        'Your Chronogram account has been blocked by an administrator and you can no '
+        + 'longer sign in. Your data has not been deleted.',
+        'If you believe this is a mistake, please reply to the administrator who contacted you.'
       ]
     },
     block: {
@@ -557,8 +677,14 @@ onMounted(load);
 </script>
 
 <style scoped>
+/*
+  La console si consulta soprattutto da desktop: il contenitore arriva a 1280px
+  e la lista diventa multi-colonna, così su uno schermo largo si vede l'intera
+  coda senza scorrere (meno carico di memoria di lavoro fra una riga e l'altra).
+  Sotto i 720px resta la card singola pensata per la WebView Android.
+*/
 .admin-container {
-  max-width: 1000px;
+  max-width: 1200px;
   margin-inline: auto;
   padding-bottom: var(--space-6);
   display: flex;
@@ -595,17 +721,45 @@ onMounted(load);
 /* ── Coda dei pending ─────────────────────────────────────── */
 
 .pending-banner {
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   flex-wrap: wrap;
   border-color: var(--peach);
+  /* Barra d'accento: dà peso alla coda senza gridare con un fondo pieno. */
+  border-left: 4px solid var(--peach);
+  background-color: color-mix(in srgb, var(--surface0), var(--peach) 6%);
+}
+
+.pending-banner .section-title {
+  font-size: var(--font-xl);
+  line-height: 1.25;
 }
 
 .pending-banner .section-title ion-icon {
   color: var(--peach);
+  flex-shrink: 0;
+}
+
+.pending-cta {
+  --background: var(--peach);
+  --color: var(--crust);
+  min-height: var(--touch-target);
+}
+
+.pending-current {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--subtext0);
+}
+
+.pending-current ion-icon {
+  color: var(--green);
 }
 
 /* ── Filtri ───────────────────────────────────────────────── */
@@ -629,11 +783,24 @@ onMounted(load);
   --background: var(--surface1);
 }
 
+/* Il conteggio è una pastiglia, non un numero appiccicato all'etichetta:
+   si legge come dato a colpo d'occhio anche a segmento non selezionato. */
 .segment-count {
   display: inline-block;
-  margin-left: var(--space-1);
+  margin-left: var(--space-2);
+  min-width: 1.5em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--surface2);
   font-size: var(--font-xs);
-  color: var(--subtext0);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.segment-count--alert {
+  background: var(--peach);
+  color: var(--crust);
 }
 
 /* ── Lista ────────────────────────────────────────────────── */
@@ -644,13 +811,19 @@ onMounted(load);
   margin: 0;
 }
 
+/*
+  `auto-fill` + `minmax` invece di un media query per colonna: la lista si
+  riempie da sola in 1, 2 o 3 colonne a seconda dello spazio reale, e il
+  `min(100%, …)` evita il traboccamento sui telefoni stretti.
+*/
 .user-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 23rem), 1fr));
   gap: var(--space-3);
+  align-items: start;
 }
 
 .user-row {
@@ -659,6 +832,26 @@ onMounted(load);
   grid-template-columns: 1fr auto;
   gap: var(--space-3);
   align-items: start;
+  align-content: start;
+  height: 100%;
+  border-left: 3px solid transparent;
+  transition: border-color 120ms ease, opacity 120ms ease;
+}
+
+/* La riga in attesa porta lo stesso accento del banner: ovunque cada nella
+   griglia si riconosce come "richiede una decisione". */
+.user-row--pending {
+  border-left-color: var(--peach);
+  background-color: color-mix(in srgb, var(--surface0), var(--peach) 4%);
+}
+
+.user-row--blocked {
+  border-left-color: var(--red);
+}
+
+/* Riga in lavorazione: resta leggibile ma dichiara di essere occupata. */
+.user-row--busy {
+  opacity: 0.6;
 }
 
 .user-identity {
@@ -681,6 +874,9 @@ onMounted(load);
 
 .status-chip {
   justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--font-xs);
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
@@ -689,6 +885,10 @@ onMounted(load);
   border-radius: var(--radius-pill);
   border: 1px solid currentColor;
   white-space: nowrap;
+}
+
+.status-chip ion-icon {
+  font-size: 0.95rem;
 }
 
 .status-chip--pending {
@@ -707,19 +907,24 @@ onMounted(load);
   grid-column: 1 / -1;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--glass-border);
 }
 
 .user-meta dt {
   font-size: var(--font-xs);
-  color: var(--overlay1);
+  /* `overlay1` non arriva a 4.5:1 sul fondo delle card: le etichette dei dati
+     salgono a `subtext0`, che lo supera in entrambi i temi. */
+  color: var(--subtext0);
   margin: 0;
 }
 
 .user-meta dd {
-  font-size: var(--font-sm);
-  color: var(--subtext1);
+  font-size: var(--font-base);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
   margin: 0;
 }
 
@@ -727,14 +932,56 @@ onMounted(load);
   grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
   justify-content: flex-end;
+  /* Le azioni restano in fondo alla card anche quando le righe della griglia
+     hanno altezze diverse: la stessa azione cade sempre alla stessa altezza. */
+  margin-top: auto;
 }
 
 .user-actions ion-button {
   --padding-start: var(--space-3);
   --padding-end: var(--space-3);
   min-height: var(--touch-target);
+  margin: 0;
+}
+
+.row-spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--peach);
+}
+
+/* ── Scheletro di caricamento ─────────────────────────────── */
+
+.user-row--skeleton {
+  gap: var(--space-3);
+  pointer-events: none;
+}
+
+.skeleton-chip {
+  justify-self: end;
+  width: 5.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+}
+
+.skeleton-meta {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-2) var(--space-3);
+}
+
+.state-block--error ion-icon {
+  color: var(--red);
+}
+
+.state-hint {
+  margin: calc(var(--space-2) * -1) 0 0;
+  font-size: var(--font-sm);
+  color: var(--subtext0);
 }
 
 /* ── Paginazione ──────────────────────────────────────────── */
@@ -790,6 +1037,23 @@ onMounted(load);
   font-size: var(--font-base);
   color: var(--subtext1);
   line-height: 1.5;
+}
+
+.confirm-reversible {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  color: var(--subtext0);
+  line-height: 1.5;
+}
+
+.confirm-reversible ion-icon {
+  color: var(--green);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 0.15em;
 }
 
 .danger-notice {

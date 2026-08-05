@@ -144,13 +144,18 @@ const goToDeleteAccount = () => {
 };
 
 
+/**
+ * Stesso wording di HomePage e della dashboard admin: la conferma di uscita è
+ * identica ovunque nell'app, così il gesto si impara una volta sola. La domanda
+ * nomina l'azione ("Sign out?") invece di "Are you sure?", che da solo non dice
+ * a cosa si sta rispondendo quando l'alert è l'unica cosa a schermo.
+ */
 const confirmLogout = async () => {
   const alert = await alertController.create({
-    header: 'Are you sure?',
-    message: 'Do you want to log out and leave the app?',
+    header: 'Sign out?',
     buttons: [
       { text: 'Cancel', role: 'cancel' },
-      { text: 'Yes, log out', role: 'destructive', handler: () => auth.logout() }
+      { text: 'Sign out', role: 'destructive', handler: () => auth.logout() }
     ]
   });
   await alert.present();

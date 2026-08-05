@@ -169,44 +169,52 @@
         </div>
       </div>
 
-      <!--
-        Modale dichiarativa (`:is-open`) e NON imperativa (`$el.present()`):
-        con la variante imperativa il primo tap veniva perso (il custom element
-        non era ancora idratato) e la `dismiss()` invocata dentro `ionChange`
-        cadeva durante l'animazione di apertura, lasciando l'overlay smontato a
-        metà (`show-modal` senza `overlay-hidden`, focus bloccato sulla modale,
-        `body { overflow: hidden }`): da lì in poi NESSUN campo del form era più
-        digitabile e il pulsante Register non si abilitava mai.
-      -->
-      <ion-modal
-          class="birthday-modal"
-          :is-open="isBirthdayOpen"
-          :keep-contents-mounted="true"
-          @didDismiss="isBirthdayOpen = false"
-      >
-        <!--
-          `prefer-wheel` + `show-default-buttons`: la ruota permette di scorrere
-          gli anni fino al 1900 senza uscire dalla dialog e il valore viene
-          confermato SOLO con "Done". Prima ogni cambio di mese/anno emetteva
-          `ionChange` e chiudeva la modale, costringendo a riaprirla a ogni passo.
-        -->
-        <ion-datetime
-            presentation="date"
-            prefer-wheel
-            :value="dateIso"
-            :min="MIN_BIRTHDAY"
-            :max="MAX_BIRTHDAY"
-            :show-default-buttons="true"
-            done-text="Done"
-            cancel-text="Cancel"
-            aria-label="Date of birth"
-            class="ion-dark"
-            @ionChange="onBirthdaySelected"
-            @ionCancel="isBirthdayOpen = false"
-        />
-      </ion-modal>
-      <ion-loading :is-open="isLoading" message="Registering..." />
     </ion-content>
+
+    <!--
+      Gli overlay stanno FUORI da `ion-content`, come fratelli di pagina.
+      Dentro `ion-content` finivano nel contenitore di scorrimento: restavano
+      nel DOM del form (un `ion-backdrop` sempre presente fra i campi, visibile
+      a chiunque ispezioni la pagina) e dipendevano dal contesto di
+      posizionamento dello scroller. Qui il loro unico contesto è `ion-page`.
+
+      Modale dichiarativa (`:is-open`) e NON imperativa (`$el.present()`):
+      con la variante imperativa il primo tap veniva perso (il custom element
+      non era ancora idratato) e la `dismiss()` invocata dentro `ionChange`
+      cadeva durante l'animazione di apertura, lasciando l'overlay smontato a
+      metà (`show-modal` senza `overlay-hidden`, focus bloccato sulla modale,
+      `body.backdrop-no-scroll` mai rimossa): da lì in poi NESSUN campo del form
+      era più digitabile e il pulsante Register non si abilitava mai.
+    -->
+    <ion-modal
+        class="birthday-modal"
+        :is-open="isBirthdayOpen"
+        :keep-contents-mounted="true"
+        @didDismiss="isBirthdayOpen = false"
+    >
+      <!--
+        `prefer-wheel` + `show-default-buttons`: la ruota permette di scorrere
+        gli anni fino al 1900 senza uscire dalla dialog e il valore viene
+        confermato SOLO con "Done". Prima ogni cambio di mese/anno emetteva
+        `ionChange` e chiudeva la modale, costringendo a riaprirla a ogni passo.
+      -->
+      <ion-datetime
+          presentation="date"
+          prefer-wheel
+          :value="dateIso"
+          :min="MIN_BIRTHDAY"
+          :max="MAX_BIRTHDAY"
+          :show-default-buttons="true"
+          done-text="Done"
+          cancel-text="Cancel"
+          aria-label="Date of birth"
+          class="ion-dark"
+          @ionChange="onBirthdaySelected"
+          @ionCancel="isBirthdayOpen = false"
+      />
+    </ion-modal>
+
+    <ion-loading :is-open="isLoading" message="Registering..." />
   </ion-page>
 </template>
 
@@ -343,6 +351,10 @@ async function handleRegister() {
     }
 
     showToast(data.message || 'Registered successfully!', 'success');
+    // Lo spinner si chiude PRIMA di navigare: se la pagina si smonta con
+    // l'overlay ancora presentato, nessuno esegue più la sua `dismiss()` e la
+    // `body.backdrop-no-scroll` resta appesa alla pagina di destinazione.
+    isLoading.value = false;
     await router.push({ name: 'Login' });
   } catch (err: unknown) {
     showToast(apiErrorMessage(err, 'Unexpected error'), 'danger');

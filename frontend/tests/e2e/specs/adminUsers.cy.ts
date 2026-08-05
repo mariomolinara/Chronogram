@@ -138,15 +138,18 @@ describe('Admin - participants', () => {
     cy.get('.user-row').eq(0).within(() => {
       cy.contains('.status-chip', 'Pending')
       cy.contains('ion-button', 'Approve').should('exist')
+      cy.contains('ion-button', 'Reject').should('exist')
       cy.contains('ion-button', 'Delete').should('exist')
       cy.contains('ion-button', 'Block').should('not.exist')
     })
     cy.get('.user-row').eq(2).within(() => {
       cy.contains('ion-button', 'Block').should('exist')
       cy.contains('ion-button', 'Approve').should('not.exist')
+      cy.contains('ion-button', 'Reject').should('not.exist')
     })
     cy.get('.user-row').eq(3).within(() => {
       cy.contains('ion-button', 'Unblock').should('exist')
+      cy.contains('ion-button', 'Reject').should('not.exist')
     })
   })
 
@@ -177,6 +180,47 @@ describe('Admin - participants', () => {
     cy.wait('@users')
     cy.get('.confirm-dialog').should('not.exist')
     expectToast('Account approved')
+  })
+
+  /**
+   * Il rifiuto non ha un endpoint proprio: `POST .../block` su un account
+   * PENDING lo respinge senza cancellarne il record. La dialog deve dirlo,
+   * mostrare l'anteprima della mail di blocco (quella che il backend invia
+   * davvero) e chiarire che la decisione è reversibile.
+   */
+  it('rifiuta una richiesta in attesa passando dall endpoint block', () => {
+    cy.intercept('POST', '**/api/admin/users/1/block', {
+      statusCode: 200,
+      body: { success: true, message: 'Account blocked. The user has been notified by email.' }
+    }).as('reject')
+
+    signInAsAdmin()
+    cy.visit('/admin/users')
+    cy.wait('@users')
+
+    cy.get('.user-row').eq(0).contains('ion-button', 'Reject').click()
+    cy.get('.confirm-dialog').should('be.visible')
+    cy.contains('.confirm-title', 'Reject this registration?')
+    cy.contains('.confirm-explanation', 'notified by email')
+    cy.contains('.confirm-explanation', 'Nothing is deleted')
+    // Reversibilità dichiarata: è la differenza fra Reject e Delete.
+    cy.contains('.confirm-reversible', 'unblock the account')
+    // L'anteprima rispecchia `EmailService.sendAccountBlockedEmail`.
+    cy.contains('.email-preview', 'Your account has been blocked')
+    cy.contains('.email-preview', 'Your data has not been deleted')
+    // A differenza di Delete, il messaggio resta facoltativo.
+    cy.get('.message-field').contains('(optional)')
+    cy.get('.confirm-actions').contains('ion-button', 'Reject')
+      .should('not.have.attr', 'disabled')
+
+    cy.get('.message-input').find('textarea').type('Your email domain is not part of the study')
+    cy.get('.confirm-actions').contains('ion-button', 'Reject').click()
+
+    cy.wait('@reject').its('request.body')
+      .should('deep.equal', { message: 'Your email domain is not part of the study' })
+    cy.wait('@users')
+    cy.get('.confirm-dialog').should('not.exist')
+    expectToast('Account blocked')
   })
 
   it('impone un messaggio per la cancellazione e avverte che è irreversibile', () => {

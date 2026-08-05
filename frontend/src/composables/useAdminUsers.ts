@@ -10,8 +10,31 @@ export type AccountStatus = 'PENDING' | 'ACTIVE' | 'BLOCKED';
 /** Valore del filtro: uno stato oppure "tutti". */
 export type StatusFilter = AccountStatus | 'ALL';
 
-/** Azioni che l'amministratore può eseguire su un account. */
-export type AdminUserAction = 'approve' | 'block' | 'unblock' | 'delete';
+/**
+ * Azioni che l'amministratore può eseguire su un account.
+ *
+ * `reject` non è un endpoint a sé: rifiutare una richiesta in attesa significa
+ * bloccarla (vedi `ACTION_ENDPOINT`). Resta però un'azione distinta lato UI
+ * perché parte da uno stato diverso, ha un'altra conseguenza per chi la subisce
+ * ("la tua richiesta non è stata accolta" invece di "il tuo accesso è sospeso")
+ * e va confermata con un testo suo.
+ */
+export type AdminUserAction = 'approve' | 'reject' | 'block' | 'unblock' | 'delete';
+
+/**
+ * Segmento di path chiamato per ciascuna azione.
+ *
+ * L'unico scostamento è `reject -> block`: `AdminUserService.block` accetta un
+ * account PENDING e lo porta a BLOCKED senza cancellarne il record, che è
+ * esattamente il rifiuto. Il contratto REST resta quello esistente.
+ */
+const ACTION_ENDPOINT: Record<AdminUserAction, string> = {
+    approve: 'approve',
+    reject: 'block',
+    block: 'block',
+    unblock: 'unblock',
+    delete: 'delete'
+};
 
 /**
  * Una riga della lista partecipanti (`AdminUserResponse` lato backend).
@@ -238,7 +261,7 @@ export function useAdminUsers(options: UseAdminUsersOptions = {}) {
         actionInProgress.value = user.userId;
         try {
             const { data } = await api.post<ApiEnvelope<unknown>>(
-                `${USERS_ENDPOINT}/${user.userId}/${action}`,
+                `${USERS_ENDPOINT}/${user.userId}/${ACTION_ENDPOINT[action]}`,
                 { message: trimmed || null }
             );
             await load();

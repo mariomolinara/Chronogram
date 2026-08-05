@@ -62,43 +62,48 @@
 
       <ion-button expand="block" class="ion-margin-top">Save Changes</ion-button>
 
-      <!--
-        Stessa correzione di RegistrationPage.vue: modale dichiarativa
-        (`:is-open`) invece di `$el.present()/dismiss()`. Con la variante
-        imperativa il primo tap veniva perso (custom element non ancora
-        idratato) e la `dismiss()` chiamata dentro `ionChange` cadeva durante
-        l'animazione di apertura, lasciando l'overlay smontato a metà
-        (`show-modal` senza `overlay-hidden`, focus bloccato sulla modale):
-        da lì in poi nessun campo della pagina era più editabile.
-      -->
-      <ion-modal
-          class="birthday-modal"
-          :is-open="isBirthdayOpen"
-          :keep-contents-mounted="true"
-          @didDismiss="isBirthdayOpen = false"
-      >
-        <!--
-          `prefer-wheel` + `show-default-buttons`: si scorre l'anno fino al 1900
-          senza uscire dalla dialog e il valore viene confermato SOLO con "Done".
-          Prima ogni cambio di mese/anno emetteva `ionChange` e chiudeva tutto.
-        -->
-        <ion-datetime
-            id="birthday-datetime"
-            presentation="date"
-            prefer-wheel
-            :value="pickerValue"
-            :min="MIN_BIRTHDAY"
-            :max="MAX_BIRTHDAY"
-            :show-default-buttons="true"
-            done-text="Done"
-            cancel-text="Cancel"
-            aria-label="Date of birth"
-            class="ion-dark"
-            @ionChange="onBirthdaySelected"
-            @ionCancel="isBirthdayOpen = false"
-        />
-      </ion-modal>
     </ion-content>
+
+    <!--
+      La modale sta FUORI da `ion-content` (vedi RegistrationPage.vue): dentro
+      lo scroller lasciava il proprio `ion-backdrop` nel DOM del form e
+      dipendeva dal contesto di posizionamento del contenuto.
+
+      Stessa correzione di RegistrationPage.vue anche sul modo di aprirla:
+      modale dichiarativa (`:is-open`) invece di `$el.present()/dismiss()`. Con
+      la variante imperativa il primo tap veniva perso (custom element non
+      ancora idratato) e la `dismiss()` chiamata dentro `ionChange` cadeva
+      durante l'animazione di apertura, lasciando l'overlay smontato a metà
+      (`show-modal` senza `overlay-hidden`, focus bloccato sulla modale):
+      da lì in poi nessun campo della pagina era più editabile.
+    -->
+    <ion-modal
+        class="birthday-modal"
+        :is-open="isBirthdayOpen"
+        :keep-contents-mounted="true"
+        @didDismiss="isBirthdayOpen = false"
+    >
+      <!--
+        `prefer-wheel` + `show-default-buttons`: si scorre l'anno fino al 1900
+        senza uscire dalla dialog e il valore viene confermato SOLO con "Done".
+        Prima ogni cambio di mese/anno emetteva `ionChange` e chiudeva tutto.
+      -->
+      <ion-datetime
+          id="birthday-datetime"
+          presentation="date"
+          prefer-wheel
+          :value="pickerValue"
+          :min="MIN_BIRTHDAY"
+          :max="MAX_BIRTHDAY"
+          :show-default-buttons="true"
+          done-text="Done"
+          cancel-text="Cancel"
+          aria-label="Date of birth"
+          class="ion-dark"
+          @ionChange="onBirthdaySelected"
+          @ionCancel="isBirthdayOpen = false"
+      />
+    </ion-modal>
   </ion-page>
 </template>
 

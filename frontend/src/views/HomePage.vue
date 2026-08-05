@@ -57,18 +57,32 @@
               </ion-card>
             </div>
           </transition-group>
+          <!--
+            Loading state: sta DENTRO il contenuto, non è più un `ion-loading`
+            a tutta pagina. Quello veniva aperto durante il montaggio della
+            vista, prima che il custom element fosse idratato: `ion-loading`
+            in quel caso rimanda la `present()` a un `requestAnimationFrame`
+            (vedi `componentDidLoad`), e se nel frattempo la risposta è già
+            arrivata la `dismiss()` non trova nulla da chiudere. L'overlay
+            veniva presentato subito dopo e non lo chiudeva più nessuno:
+            backdrop a tutto schermo e `body.backdrop-no-scroll` appesi per
+            sempre, con l'app inutilizzabile. Un indicatore nel flusso non ha
+            questa classe di problemi e non blocca comunque la pagina.
+          -->
+          <div v-if="isLoading" class="state-block" role="status" aria-live="polite">
+            <ion-spinner name="crescent" aria-hidden="true" />
+            <ion-text>Loading activities…</ion-text>
+          </div>
+
           <!-- Error state -->
-          <div v-if="loadError && !isLoading" class="state-block">
+          <div v-else-if="loadError" class="state-block">
             <ion-icon :icon="alertCircleOutline" aria-hidden="true" />
             <ion-text>Couldn't load your activities.</ion-text>
             <ion-button fill="outline" size="small" @click="fetchActivities">Retry</ion-button>
           </div>
 
           <!-- Empty state -->
-          <div
-              v-else-if="activities.length === 0 && !isLoading"
-              class="state-block"
-          >
+          <div v-else-if="activities.length === 0" class="state-block">
             <ion-icon :icon="calendarClearOutline" aria-hidden="true" />
             <ion-text>No activities for today.</ion-text>
             <ion-button fill="outline" size="small" @click="addActivity">Add your first activity</ion-button>
@@ -102,7 +116,6 @@
           </div>
         </div>
       </div>
-      <ion-loading :is-open="isLoading" message="Loading activities..." />
     </ion-content>
     <ion-alert
         :is-open="showDeleteConfirm"
@@ -120,7 +133,7 @@ import { useRouter } from 'vue-router';
 import {
   IonPage, IonHeader, IonToolbar, IonButtons, IonContent, IonIcon, IonButton,
   IonCard, IonCardContent, IonFabButton,
-  IonLoading, IonText, IonAlert, alertController
+  IonSpinner, IonText, IonAlert, alertController
 } from '@ionic/vue';
 import {
   homeOutline, settingsOutline, personCircleOutline, addOutline, trashBinOutline,

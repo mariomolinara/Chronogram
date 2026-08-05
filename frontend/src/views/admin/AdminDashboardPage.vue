@@ -40,6 +40,7 @@
                     class="pending-badge"
                     :aria-label="`${pendingCount} registrations waiting for approval`"
                 >
+                  <ion-icon :icon="hourglassOutline" aria-hidden="true" />
                   {{ pendingCount }} pending
                 </span>
               </h2>
@@ -212,7 +213,8 @@ import {
   IonButtons, IonSpinner, alertController, onIonViewWillEnter, toastController
 } from '@ionic/vue';
 import {
-  alertCircleOutline, downloadOutline, exitOutline, keyOutline, peopleOutline
+  alertCircleOutline, downloadOutline, exitOutline, hourglassOutline, keyOutline,
+  peopleOutline
 } from 'ionicons/icons';
 import { api } from '@/composables/useApi';
 import { useAuthStore } from '@/store/auth';
@@ -420,7 +422,7 @@ onUnmounted(() => {
 <style scoped>
 .admin-container {
   /* Più largo delle pagine mobile: la dashboard si consulta da desktop. */
-  max-width: 1000px;
+  max-width: 1200px;
   margin-inline: auto;
   padding-bottom: var(--space-6);
   display: flex;
@@ -459,8 +461,12 @@ onUnmounted(() => {
   margin-bottom: 0;
 }
 
-/* Il badge non affida il significato al solo colore: porta anche la parola. */
+/* Il badge non affida il significato al solo colore: porta parola e icona,
+   le stesse della coda in AdminUsersPage. */
 .pending-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--font-xs);
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
