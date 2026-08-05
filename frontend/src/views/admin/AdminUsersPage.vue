@@ -284,7 +284,10 @@
           <div class="message-field">
             <label class="message-label" for="admin-message">
               Message to the user
-              <span v-if="messageRequired" class="required">(required)</span>
+              <template v-if="messageRequired">
+                <span class="required-marker" aria-hidden="true">*</span>
+                <span class="required">(required)</span>
+              </template>
               <span v-else class="optional">(optional)</span>
             </label>
             <ion-textarea
@@ -322,9 +325,11 @@
 
           <div class="confirm-actions">
             <ion-button fill="outline" :disabled="submitting" @click="closeDialog">Cancel</ion-button>
+            <!-- Premibile anche senza messaggio: la pressione spiega cosa
+                 manca, invece di lasciare un pulsante spento senza motivo. -->
             <ion-button
                 :color="confirmColor"
-                :disabled="submitting || (messageRequired && !trimmedMessage)"
+                :disabled="submitting"
                 @click="confirm"
             >
               {{ submitting ? 'Working…' : confirmLabel }}
@@ -652,6 +657,14 @@ async function focusMessage(): Promise<void> {
 
 async function confirm(): Promise<void> {
   if (!dialog.value) {
+    return;
+  }
+
+  // La cancellazione richiede una motivazione: senza, l'utente riceverebbe una
+  // email che annuncia la perdita dei dati e non spiega perché.
+  if (messageRequired.value && !trimmedMessage.value) {
+    dialogError.value = 'Write the message the user will receive: it is required to delete an account.';
+    await focusMessage();
     return;
   }
 
@@ -1090,8 +1103,11 @@ onMounted(load);
   color: var(--subtext1);
 }
 
+/* Stesso colore dell'asterisco che la precede: sono un unico segnale
+   "obbligatorio". Il rosso resta riservato agli errori veri, altrimenti il
+   campo sembra già sbagliato prima ancora di essere compilato. */
 .message-label .required {
-  color: var(--red);
+  color: var(--color-required, var(--peach));
 }
 
 .message-label .optional {
@@ -1153,10 +1169,12 @@ onMounted(load);
   color: var(--overlay1);
 }
 
-.field-error {
+/* Dentro la dialog l'errore non è agganciato a un `ion-item`: la spaziatura la
+   dà il layout della dialog e non serve il rientro allineato all'input.
+   Colore e tipografia restano quelli della regola globale. */
+.confirm-dialog .field-error {
   margin: 0;
-  font-size: var(--font-sm);
-  color: var(--red);
+  padding-inline-start: 0;
 }
 
 .confirm-actions {

@@ -44,12 +44,32 @@
             </button>
 
             <!-- Promemoria persistente: il toast è effimero, questo resta
-                 finché l'utente non salva o lo chiude. -->
+                 finché l'utente non salva o lo chiude. Riporta anche la frase
+                 inviata all'AI: senza di essa l'utente non ha modo di
+                 confrontare quello che ha chiesto con i campi compilati. -->
             <div v-if="showAiReview" class="ai-review">
               <ion-icon :icon="sparkles" class="ai-review-icon" aria-hidden="true" />
-              <span class="ai-review-text">
-                Filled by AI. Check the highlighted fields before saving.
-              </span>
+              <div class="ai-review-body">
+                <!-- Prima l'azione da compiere, poi la citazione che la
+                     motiva: invertendo l'ordine il riquadro della frase, più
+                     pesante, si prende l'attenzione e l'istruzione scade a
+                     didascalia. -->
+                <span class="ai-review-text">
+                  Filled by AI. Check the highlighted fields before saving.
+                </span>
+                <!-- `tabindex="0"`: il blocco può scorrere e senza focus da
+                     tastiera il testo eccedente sarebbe irraggiungibile. -->
+                <div
+                    v-if="lastAiPrompt"
+                    class="ai-review-prompt"
+                    tabindex="0"
+                    role="group"
+                    aria-label="The request you sent to the AI"
+                >
+                  <span class="ai-review-prompt-label">Your request</span>
+                  <q class="ai-review-prompt-text">{{ lastAiPrompt }}</q>
+                </div>
+              </div>
               <button
                   type="button"
                   class="ai-review-close tap-target"
@@ -61,31 +81,45 @@
             </div>
           </section>
 
+          <FormLegend />
+
           <ion-list lines="none">
             <!-- Name -->
-            <ion-item :class="[errorClass('name'), aiClass('name')]" class="glass-input">
+            <ion-item
+                :class="[fieldClass('name'), aiClass('name')]"
+                class="glass-input"
+                data-field="name"
+            >
               <ion-icon slot="start" :icon="clipboardOutline" class="input-icon" aria-hidden="true" />
               <ion-input
                   v-model="activity.name"
-                  label="Name of Activity"
                   label-placement="floating"
-                  :aria-label="'Activity Name'"
-              />
+                  :aria-invalid="!!errorFor('name')"
+              >
+                <div slot="label">Name of Activity <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('name')" />
 
             <!-- Duration -->
-            <ion-item :class="[errorClass('durationMins'), aiClass('durationMins')]" class="glass-input">
+            <ion-item
+                :class="[fieldClass('durationMins'), aiClass('durationMins')]"
+                class="glass-input"
+                data-field="durationMins"
+            >
               <ion-icon slot="start" :icon="timeOutline" class="input-icon" aria-hidden="true" />
               <ion-input
                   v-model.number="activity.durationMins"
                   type="number"
-                  label="Duration (minutes)"
                   label-placement="floating"
                   min="1"
                   max="1440"
-              />
-              <ion-note slot="error">Enter 1-1440 minutes</ion-note>
+                  :aria-invalid="!!errorFor('durationMins')"
+              >
+                <div slot="label">Duration (minutes) <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('durationMins')" />
 
             <!-- Details -->
             <ion-item :class="aiClass('details')" class="glass-input">
@@ -102,15 +136,20 @@
             </ion-item>
 
             <!-- Type -->
-            <ion-item :class="[errorClass('activityTypeId'), aiClass('activityTypeId')]" class="glass-input">
+            <ion-item
+                :class="[fieldClass('activityTypeId'), aiClass('activityTypeId')]"
+                class="glass-input"
+                data-field="activityTypeId"
+            >
               <ion-icon slot="start" :icon="pricetagsOutline" class="input-icon" aria-hidden="true" />
               <ion-select
                   v-model="activity.activityTypeId"
-                  label="Type of activity"
                   label-placement="floating"
                   interface="popover"
                   :interface-options="{ cssClass: 'ion-dark catppuccin-select-overlay' }"
+                  :aria-invalid="!!errorFor('activityTypeId')"
               >
+                <div slot="label">Type of activity <RequiredMark /></div>
                 <ion-select-option
                     v-for="type in activityTypes"
                     :key="type.activityTypeId"
@@ -120,6 +159,7 @@
                 </ion-select-option>
               </ion-select>
             </ion-item>
+            <FieldError :message="errorFor('activityTypeId')" />
 
             <!-- Pleasantness -->
             <ion-item :class="aiClass('pleasantness')" class="glass-input">
@@ -159,19 +199,25 @@
             </ion-item>
 
             <!-- Recurrence -->
-            <ion-item :class="[errorClass('recurrence'), aiClass('recurrence')]" class="glass-input">
+            <ion-item
+                :class="[fieldClass('recurrence'), aiClass('recurrence')]"
+                class="glass-input"
+                data-field="recurrence"
+            >
               <ion-icon slot="start" :icon="repeatOutline" class="input-icon" aria-hidden="true" />
               <ion-select
                   v-model="activity.recurrence"
-                  label="Recurrence"
                   label-placement="floating"
                   interface="popover"
                   :interface-options="{ cssClass: 'ion-dark catppuccin-select-overlay' }"
+                  :aria-invalid="!!errorFor('recurrence')"
               >
+                <div slot="label">Recurrence <RequiredMark /></div>
                 <ion-select-option value="R">Routinary (R)</ion-select-option>
                 <ion-select-option value="E">Exceptional (E)</ion-select-option>
               </ion-select>
             </ion-item>
+            <FieldError :message="errorFor('recurrence')" />
 
             <!-- Cost -->
             <ion-item :class="aiClass('costEuro')" class="glass-input">
@@ -210,9 +256,11 @@
                 <ion-button expand="block" class="pill-button gradient-outline" @click="router.back()">Cancel</ion-button>
               </ion-col>
               <ion-col size="5">
+                <!-- Il pulsante resta premibile: è la pressione a spiegare
+                     cosa manca. Disabilitato solo durante il salvataggio. -->
                 <ion-button
                     expand="block"
-                    :disabled="isLoading || hasErrors"
+                    :disabled="isLoading"
                     class="pill-button gradient-outline"
                     @click="saveActivity"
                 >
@@ -340,6 +388,12 @@ import {
 
 import { api, apiErrorMessage } from '@/composables/useApi';
 import { useToast } from '@/composables/useToast';
+import {
+  collectErrors, errorSummary, isBlank, requiredMessage, useFormValidation
+} from '@/composables/useValidation';
+import RequiredMark from '@/components/RequiredMark.vue';
+import FieldError from '@/components/FieldError.vue';
+import FormLegend from '@/components/FormLegend.vue';
 import { useActivityStore } from '@/store/activityStore';
 
 const router = useRouter();
@@ -360,6 +414,12 @@ const aiNotice = ref<{ tone: 'error' | 'warning'; text: string } | null>(null);
 const aiFilledFields = ref<string[]>([]);
 /** Banner persistente "rivedi prima di salvare". */
 const showAiReview = ref(false);
+/**
+ * Frase realmente usata per l'ultima estrazione riuscita. La textarea viene
+ * svuotata alla chiusura della modale: senza questa copia l'utente si ritrova i
+ * campi compilati e nessun modo di ricordare cosa aveva chiesto.
+ */
+const lastAiPrompt = ref('');
 
 const promptField = ref<any>(null);
 const aiEntryButton = ref<HTMLButtonElement | null>(null);
@@ -395,27 +455,54 @@ const aiExamples = [
   }
 ];
 
-/* ---------- Validation ---------- */
-const hasErrors = computed(() =>
-    !activity.name.trim() ||
-    !activity.durationMins ||
-    activity.durationMins <= 0 ||
-    activity.durationMins > 1440 ||
-    !activity.activityTypeId ||
-    !activity.recurrence
-);
+/* ---------- Validation ----------
+   I messaggi dicono COME compilare il campo (intervallo ammesso, valori
+   possibili): "invalid" da solo lascia l'utente a indovinare. */
 
-const errorClass = (field: keyof typeof activity) => ({
-  'ion-invalid':
-      (field === 'name' && !activity.name.trim()) ||
-      (field === 'durationMins' && (
-          !activity.durationMins ||
-          activity.durationMins <= 0 ||
-          activity.durationMins > 1440
-      )) ||
-      (field === 'activityTypeId' && !activity.activityTypeId) ||
-      (field === 'recurrence' && !activity.recurrence)
-});
+/** Campi obbligatori, nell'ordine in cui compaiono nella form. */
+const REQUIRED_ORDER = ['name', 'durationMins', 'activityTypeId', 'recurrence'] as const;
+type RequiredField = (typeof REQUIRED_ORDER)[number];
+
+const MIN_DURATION = 1;
+const MAX_DURATION = 1440;
+
+const { errors, isValid, errorFor, fieldClass, validateOnSubmit, reset: resetValidation } =
+    useFormValidation<RequiredField>(() => {
+      // Con `v-model.number` un campo svuotato torna stringa vuota: va trattato
+      // come "mancante", non come "fuori intervallo".
+      const raw = activity.durationMins;
+      const duration = Number(raw);
+      const durationMissing =
+          raw === null || raw === undefined || String(raw).trim() === '' || Number.isNaN(duration);
+
+      return collectErrors<RequiredField>([
+        {
+          field: 'name',
+          invalid: isBlank(activity.name),
+          message: requiredMessage('Name')
+        },
+        {
+          field: 'durationMins',
+          invalid: durationMissing,
+          message: `Duration is required (${MIN_DURATION}-${MAX_DURATION} minutes)`
+        },
+        {
+          field: 'durationMins',
+          invalid: !durationMissing && (duration < MIN_DURATION || duration > MAX_DURATION),
+          message: `Duration must be between ${MIN_DURATION} and ${MAX_DURATION} minutes`
+        },
+        {
+          field: 'activityTypeId',
+          invalid: !activity.activityTypeId,
+          message: 'Select an activity type'
+        },
+        {
+          field: 'recurrence',
+          invalid: !activity.recurrence,
+          message: 'Select a recurrence: Routinary or Exceptional'
+        }
+      ]);
+    }, REQUIRED_ORDER);
 
 /** Evidenziazione temporanea dei campi toccati dall'AI. */
 const aiClass = (field: keyof typeof activity) => ({
@@ -459,6 +546,7 @@ function useExample(text: string) {
 function dismissAiReview() {
   showAiReview.value = false;
   aiFilledFields.value = [];
+  lastAiPrompt.value = '';
 }
 
 /* ---------- Normalizzazione della risposta LLM ----------
@@ -584,15 +672,18 @@ async function handleMagicInput() {
     }
 
     markAiFilled(filled);
+    // La frase va salvata PRIMA di svuotare la textarea: è quella che il banner
+    // mostra in cima alla form per il confronto con i campi compilati.
+    lastAiPrompt.value = prompt;
     naturalInput.value = '';
     isModalOpen.value = false;
     void hapticFeedback();
 
     showToast(
-        hasErrors.value
-            ? 'AI filled some fields — complete the rest and save'
-            : 'Fields filled by AI — check them and save',
-        hasErrors.value ? 'warning' : 'success'
+        isValid.value
+            ? 'Fields filled by AI — check them and save'
+            : 'AI filled some fields — complete the rest and save',
+        isValid.value ? 'success' : 'warning'
     );
   } catch (err: unknown) {
     // Guasto tecnico: 502 (provider che risponde male o non risponde) o 503
@@ -616,8 +707,11 @@ async function handleMagicInput() {
 const isEdit = computed(() => !!route.query.id);
 
 async function saveActivity() {
-  if (hasErrors.value) {
-    showToast('Please fill required fields correctly', 'danger');
+  // Accende i messaggi inline, porta il focus sul primo campo invalido e
+  // riassume in un toast: prima il pulsante era disabilitato e non succedeva
+  // nulla di tutto questo.
+  if (!(await validateOnSubmit())) {
+    await showToast(errorSummary(errors.value), 'danger');
     return;
   }
 
@@ -639,6 +733,7 @@ async function saveActivity() {
 
     showToast('Activity saved successfully!', 'success');
     dismissAiReview();
+    resetValidation();
 
     const activityStore = useActivityStore();
     activityStore.needsRefresh = true;
@@ -744,14 +839,40 @@ ion-item.item-has-focus::after{background:var(--peach);opacity:1}
 
 /* Promemoria di revisione post-compilazione */
 .ai-review{
-  display:flex;align-items:center;gap:var(--space-2);
-  margin-top:var(--space-3);padding:var(--space-2) var(--space-3);
+  display:flex;align-items:flex-start;gap:var(--space-2);
+  margin-top:var(--space-3);padding:var(--space-3);
   border:1px solid color-mix(in srgb,var(--mauve) 45%,transparent);
   border-radius:var(--radius-md);
   background:color-mix(in srgb,var(--mauve) 12%,transparent);
 }
-.ai-review-icon{flex:0 0 auto;font-size:16px;color:var(--mauve)}
-.ai-review-text{flex:1;font-size:var(--font-sm);line-height:1.35;color:var(--text)}
+.ai-review-icon{flex:0 0 auto;font-size:16px;color:var(--mauve);margin-top:2px}
+.ai-review-body{display:flex;flex-direction:column;gap:var(--space-2);flex:1;min-width:0}
+.ai-review-text{font-size:var(--font-sm);line-height:1.35;color:var(--text)}
+
+/* Frase inviata all'AI: citazione, non testo di sistema. Il testo lungo va a
+   capo e, oltre ~6 righe, scorre invece di allungare la pagina e spingere il
+   form fuori schermo. */
+.ai-review-prompt{
+  padding:var(--space-2) var(--space-3);
+  border-inline-start:3px solid var(--mauve);
+  border-radius:var(--radius-sm);
+  background:var(--surface0);
+  max-height:7.5rem;overflow-y:auto;
+  overflow-wrap:anywhere;
+}
+/* Il blocco è focusabile per poterlo scorrere da tastiera: il focus deve
+   vedersi (la regola globale copre solo link e bottoni). */
+.ai-review-prompt:focus-visible{
+  outline:2px solid var(--mauve);outline-offset:2px
+}
+.ai-review-prompt-label{
+  display:block;margin-bottom:var(--space-1);
+  font-size:var(--font-xs);letter-spacing:.04em;text-transform:uppercase;
+  color:var(--text-muted,var(--subtext0))
+}
+.ai-review-prompt-text{
+  font-size:var(--font-sm);line-height:1.4;font-style:italic;color:var(--text)
+}
 .ai-review-close{
   display:flex;align-items:center;justify-content:center;flex:0 0 auto;
   background:transparent;border:0;cursor:pointer;color:var(--subtext0);

@@ -72,12 +72,15 @@ http://ionicframework.com/docs/theming/ */
   color: var(--peach);
 }
 
-/* Muted helper/subtitle text with consistent contrast */
+/* Muted helper/subtitle text with consistent contrast.
+   `--text-muted` (definito per tema in catppuccin.scss) invece di `--subtext0`
+   diretto: nel tema chiaro subtext0 si ferma a 4.4:1 su `--base` e 3.2:1 su
+   `--surface0`, sotto il minimo WCAG AA per il testo. */
 .page-subtitle {
   font-size: var(--font-base);
   text-align: center;
   margin: 0 0 var(--space-5);
-  color: var(--subtext0);
+  color: var(--text-muted, var(--subtext0));
 }
 
 /* Reusable glass card container */

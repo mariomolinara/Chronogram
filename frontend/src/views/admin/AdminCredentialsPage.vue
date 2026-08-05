@@ -28,37 +28,48 @@
           Leave a field empty to keep its current value.
         </p>
 
+        <FormLegend />
+
         <form @submit.prevent="submit">
-          <ion-item lines="inset">
-            <ion-label position="stacked">Current password</ion-label>
+          <ion-item lines="inset" :class="fieldClass('currentPassword')" data-field="currentPassword">
+            <ion-label position="stacked">Current password <RequiredMark /></ion-label>
             <ion-input
                 v-model="currentPassword"
                 type="password"
                 autocomplete="current-password"
                 required
                 placeholder="Enter the current password"
+                :aria-invalid="!!errorFor('currentPassword')"
             />
           </ion-item>
+          <FieldError :message="errorFor('currentPassword')" />
 
-          <ion-item lines="inset">
+          <ion-item lines="inset" :class="fieldClass('newEmail')" data-field="newEmail">
             <ion-label position="stacked">New email (optional)</ion-label>
             <ion-input
                 v-model="newEmail"
                 type="email"
                 autocomplete="username"
                 :placeholder="auth.username ?? 'admin@example.com'"
+                :aria-invalid="!!errorFor('newEmail')"
             />
           </ion-item>
+          <FieldError :message="errorFor('newEmail')" />
 
-          <ion-item lines="inset">
+          <ion-item lines="inset" :class="fieldClass('newPassword')" data-field="newPassword">
             <ion-label position="stacked">
-              New password {{ forced ? '' : '(optional)' }}
+              New password
+              <!-- Obbligatoria solo quando il cambio è imposto: negli altri
+                   casi resta un campo facoltativo e va detto. -->
+              <RequiredMark v-if="forced" />
+              <template v-else>(optional)</template>
             </ion-label>
             <ion-input
                 v-model="newPassword"
                 :type="showPassword ? 'text' : 'password'"
                 autocomplete="new-password"
                 placeholder="At least 8 characters"
+                :aria-invalid="!!errorFor('newPassword')"
             />
             <ion-icon
                 :icon="showPassword ? eyeOffOutline : eyeOutline"
@@ -72,18 +83,26 @@
                 @keydown.space.prevent="showPassword = !showPassword"
             />
           </ion-item>
+          <FieldError :message="errorFor('newPassword')" />
 
-          <ion-item lines="inset">
-            <ion-label position="stacked">Confirm new password</ion-label>
+          <ion-item lines="inset" :class="fieldClass('confirmPassword')" data-field="confirmPassword">
+            <ion-label position="stacked">
+              Confirm new password
+              <RequiredMark v-if="forced" />
+            </ion-label>
             <ion-input
                 v-model="confirmPassword"
                 :type="showPassword ? 'text' : 'password'"
                 autocomplete="new-password"
                 placeholder="Repeat the new password"
+                :aria-invalid="!!errorFor('confirmPassword')"
             />
           </ion-item>
+          <FieldError :message="errorFor('confirmPassword')" />
 
-          <p v-if="validationError" class="field-error" role="alert">{{ validationError }}</p>
+          <!-- Errore restituito dal server (password corrente sbagliata, email
+               già in uso): riguarda l'intero invio, non un singolo campo. -->
+          <p v-if="submitError" class="field-error" role="alert">{{ submitError }}</p>
 
           <ion-button type="submit" expand="block" class="submit-btn" :disabled="submitting">
             {{ submitting ? 'Saving…' : 'Save changes' }}
@@ -103,6 +122,12 @@ import {
 } from '@ionic/vue';
 import { arrowBackOutline, eyeOffOutline, eyeOutline, warningOutline } from 'ionicons/icons';
 import { api } from '@/composables/useApi';
+import {
+  collectErrors, isBlank, isValidEmail, requiredMessage, useFormValidation, EMAIL_ERROR
+} from '@/composables/useValidation';
+import RequiredMark from '@/components/RequiredMark.vue';
+import FieldError from '@/components/FieldError.vue';
+import FormLegend from '@/components/FormLegend.vue';
 import { useAuthStore } from '@/store/auth';
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -116,39 +141,64 @@ const newPassword = ref('');
 const confirmPassword = ref('');
 const showPassword = ref(false);
 const submitting = ref(false);
-const validationError = ref<string | null>(null);
+/** Errore restituito dal server: vale per l'invio, non per un campo singolo. */
+const submitError = ref<string | null>(null);
 
 /** Il cambio è imposto finché l'account usa la password di provisioning. */
 const forced = computed(() => auth.mustChangePassword);
 
 const goToDashboard = () => router.push({ name: 'AdminDashboard' });
 
-/** Restituisce il primo errore bloccante, o null se il form è valido. */
-function validate(): string | null {
-  if (!currentPassword.value) {
-    return 'The current password is required.';
-  }
-  const wantsEmail = newEmail.value.trim().length > 0;
-  const wantsPassword = newPassword.value.length > 0;
+/* ---------- validazione ----------
+   Prima il form mostrava un solo messaggio alla volta, in fondo alla pagina e
+   senza indicare il campo. Ora ogni errore sta sotto il campo che lo genera;
+   resta la regola "almeno un campo fra email e password", che non appartiene a
+   un campo solo ed è agganciata al primo dei due. */
+const REQUIRED_ORDER = ['currentPassword', 'newEmail', 'newPassword', 'confirmPassword'] as const;
+type CredentialField = (typeof REQUIRED_ORDER)[number];
 
-  if (forced.value && !wantsPassword) {
-    return 'Choose a new password to continue.';
-  }
-  if (!wantsEmail && !wantsPassword) {
-    return 'Enter a new email, a new password, or both.';
-  }
-  if (wantsPassword && newPassword.value.length < MIN_PASSWORD_LENGTH) {
-    return `The new password must be at least ${MIN_PASSWORD_LENGTH} characters long.`;
-  }
-  if (wantsPassword && newPassword.value !== confirmPassword.value) {
-    return 'The two passwords do not match.';
-  }
-  return null;
-}
+const { errorFor, fieldClass, validateOnSubmit } =
+    useFormValidation<CredentialField>(() => {
+      const wantsEmail = newEmail.value.trim().length > 0;
+      const wantsPassword = newPassword.value.length > 0;
+
+      return collectErrors<CredentialField>([
+        {
+          field: 'currentPassword',
+          invalid: isBlank(currentPassword.value),
+          message: requiredMessage('Current password')
+        },
+        {
+          field: 'newEmail',
+          invalid: wantsEmail && !isValidEmail(newEmail.value.trim()),
+          message: EMAIL_ERROR
+        },
+        {
+          field: 'newEmail',
+          invalid: !forced.value && !wantsEmail && !wantsPassword,
+          message: 'Enter a new email, a new password, or both'
+        },
+        {
+          field: 'newPassword',
+          invalid: forced.value && !wantsPassword,
+          message: `Choose a new password to continue (at least ${MIN_PASSWORD_LENGTH} characters)`
+        },
+        {
+          field: 'newPassword',
+          invalid: wantsPassword && newPassword.value.length < MIN_PASSWORD_LENGTH,
+          message: `The new password must be at least ${MIN_PASSWORD_LENGTH} characters long`
+        },
+        {
+          field: 'confirmPassword',
+          invalid: wantsPassword && newPassword.value !== confirmPassword.value,
+          message: 'The two passwords do not match'
+        }
+      ]);
+    }, REQUIRED_ORDER);
 
 async function submit() {
-  validationError.value = validate();
-  if (validationError.value) {
+  submitError.value = null;
+  if (!(await validateOnSubmit())) {
     return;
   }
 
@@ -182,7 +232,7 @@ async function submit() {
   } catch (err: unknown) {
     const message = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
-    validationError.value = message ?? 'Could not update the credentials. Please try again.';
+    submitError.value = message ?? 'Could not update the credentials. Please try again.';
   } finally {
     submitting.value = false;
   }
@@ -229,10 +279,12 @@ form {
   line-height: 1.5;
 }
 
-.field-error {
-  margin: 0;
-  font-size: var(--font-sm);
-  color: var(--red);
+/* Il `form` distanzia i figli con `gap: var(--space-4)`: senza correzione
+   l'errore resterebbe sospeso a metà fra il campo che descrive e il
+   successivo. Il margine negativo lo riavvicina al proprio campo (4px sopra,
+   16px sotto). Colore e tipografia restano quelli della regola globale. */
+.form-wrapper .field-error {
+  margin: calc(-1 * var(--space-3)) 0 0;
 }
 
 .eye-icon {

@@ -12,18 +12,22 @@
             Enter your email to receive reset instructions.
           </p>
 
+          <FormLegend />
+
           <ion-list lines="none">
-            <ion-item :class="errorClass('email')" class="glass-input">
+            <ion-item :class="fieldClass('email')" class="glass-input" data-field="email">
               <ion-icon slot="start" :icon="mailOutline" class="input-icon" />
               <ion-input
                   v-model="email"
-                  label="Email"
                   label-placement="floating"
                   type="email"
-                  :aria-label="'Email'"
                   autocomplete="email"
-              />
+                  :aria-invalid="!!errorFor('email')"
+              >
+                <div slot="label">Email <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('email')" />
           </ion-list>
 
           <ion-grid class="ion-margin-top">
@@ -34,9 +38,11 @@
                 </ion-button>
               </ion-col>
               <ion-col size="5">
+                <!-- Premibile anche senza email valida: è la pressione a dire
+                     cosa manca, invece di un pulsante spento e muto. -->
                 <ion-button
                     expand="block"
-                    :disabled="isLoading || !isValidEmail(email)"
+                    :disabled="isLoading"
                     class="pill-button gradient-outline"
                     @click="handleSendResetLink"
                 >
@@ -63,6 +69,13 @@ import {
 import { mailOutline, keyOutline } from 'ionicons/icons';
 import { api } from '@/composables/useApi';
 import { useToast } from '@/composables/useToast';
+import {
+  collectErrors, errorSummary, isBlank, isValidEmail, requiredMessage,
+  useFormValidation, EMAIL_ERROR
+} from '@/composables/useValidation';
+import RequiredMark from '@/components/RequiredMark.vue';
+import FieldError from '@/components/FieldError.vue';
+import FormLegend from '@/components/FormLegend.vue';
 
 /* ---------- state ---------- */
 const router = useRouter();
@@ -71,19 +84,20 @@ const email = ref('');
 
 const { showToast } = useToast();
 
-/* ---------- computed ---------- */
-const isValidEmail = (e: string) =>
-    /^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/.test(e);
+/* ---------- validazione ---------- */
+const REQUIRED_ORDER = ['email'] as const;
+type RequiredField = (typeof REQUIRED_ORDER)[number];
 
-const errorClass = (f: string) => ({
-  'ion-invalid': f === 'email' && email.value && !isValidEmail(email.value)
-});
-
+const { errors, errorFor, fieldClass, validateOnSubmit } =
+    useFormValidation<RequiredField>(() => collectErrors<RequiredField>([
+      { field: 'email', invalid: isBlank(email.value), message: requiredMessage('Email') },
+      { field: 'email', invalid: !isValidEmail(email.value), message: EMAIL_ERROR }
+    ]), REQUIRED_ORDER);
 
 /* ---------- password reset ---------- */
 async function handleSendResetLink() {
-  if (!isValidEmail(email.value)) {
-    showToast('Please enter a valid email address', 'danger');
+  if (!(await validateOnSubmit())) {
+    await showToast(errorSummary(errors.value), 'danger');
     return;
   }
 

@@ -242,9 +242,14 @@ describe('Admin - participants', () => {
     cy.contains('.danger-notice', 'cannot be undone')
     cy.contains('.danger-notice', 'has not recorded any activity yet')
     cy.get('.message-field').contains('(required)')
-    // Senza messaggio il pulsante di conferma resta disabilitato.
+    // Il pulsante è premibile: è la pressione a dire cosa manca. Prima restava
+    // disabilitato e nessuno spiegava perché.
     cy.get('.confirm-actions').contains('ion-button', 'Delete')
-      .should('have.attr', 'disabled')
+      .should('not.have.attr', 'disabled')
+      .click()
+    cy.contains('.field-error', 'Write the message the user will receive')
+    // Niente chiamata al backend finché il messaggio manca.
+    cy.get('@delete.all').should('have.length', 0)
 
     cy.get('.message-input').find('textarea').type('Duplicate account')
     cy.get('.confirm-actions').contains('ion-button', 'Delete').click()

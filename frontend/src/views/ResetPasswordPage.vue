@@ -12,19 +12,26 @@
             Enter your new password below. Make sure it's a strong one!
           </p>
 
+          <FormLegend />
+
           <ion-list lines="none">
             <!-- New Password Field -->
-            <ion-item :class="errorClass('password')" class="glass-input password-item">
+            <ion-item
+                :class="fieldClass('newPassword')"
+                class="glass-input password-item"
+                data-field="newPassword"
+            >
               <ion-icon slot="start" :icon="lockClosedOutline" class="input-icon" />
               <ion-input
                   v-model="form.newPassword"
-                  label="New Password"
                   label-placement="floating"
                   :type="showPassword ? 'text' : 'password'"
-                  :aria-label="'New Password'"
                   autocomplete="new-password"
-                  @ionInput="validatePassword"
-              />
+                  :helper-text="PASSWORD_HINT"
+                  :aria-invalid="!!errorFor('newPassword')"
+              >
+                <div slot="label">New Password <RequiredMark /></div>
+              </ion-input>
               <ion-icon
                   slot="end"
                   :icon="showPassword ? eyeOffOutline : eyeOutline"
@@ -37,29 +44,27 @@
                   @keydown.space.prevent="showPassword = !showPassword"
               />
             </ion-item>
+            <FieldError :message="errorFor('newPassword')" />
 
             <!-- Confirm Password Field -->
-            <ion-item :class="errorClass('confirmPassword')" class="glass-input">
+            <ion-item
+                :class="fieldClass('confirmPassword')"
+                class="glass-input"
+                data-field="confirmPassword"
+            >
               <ion-icon slot="start" :icon="lockClosedOutline" class="input-icon" />
               <ion-input
                   v-model="form.confirmPassword"
-                  label="Confirm Password"
                   label-placement="floating"
                   type="password"
-                  :aria-label="'Confirm Password'"
                   autocomplete="new-password"
-                  @ionInput="validatePassword"
-              />
+                  :aria-invalid="!!errorFor('confirmPassword')"
+              >
+                <div slot="label">Confirm Password <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('confirmPassword')" />
           </ion-list>
-
-          <!-- Validation Messages -->
-          <div v-if="errors.password" class="error-message">
-            {{ errors.password }}
-          </div>
-          <div v-if="errors.confirmPassword" class="error-message">
-            {{ errors.confirmPassword }}
-          </div>
 
           <ion-grid class="ion-margin-top">
             <ion-row class="ion-justify-content-around">
@@ -71,7 +76,7 @@
               <ion-col size="5">
                 <ion-button
                     expand="block"
-                    :disabled="isLoading || hasErrors"
+                    :disabled="isLoading"
                     class="pill-button gradient-outline"
                     @click="handleResetPassword"
                 >
@@ -90,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonPage, IonContent, IonList, IonItem, IonInput, IonIcon,
@@ -100,6 +105,13 @@ import {
 import { keyOutline, lockClosedOutline, eyeOutline, eyeOffOutline } from 'ionicons/icons';
 import { api } from '@/composables/useApi';
 import { useToast } from '@/composables/useToast';
+import {
+  collectErrors, errorSummary, isBlank, isStrongPassword, requiredMessage,
+  useFormValidation, PASSWORD_ERROR, PASSWORD_HINT
+} from '@/composables/useValidation';
+import RequiredMark from '@/components/RequiredMark.vue';
+import FieldError from '@/components/FieldError.vue';
+import FormLegend from '@/components/FormLegend.vue';
 
 /* ---------- state ---------- */
 const route = useRoute();
@@ -113,50 +125,41 @@ const form = reactive({
   confirmPassword: ''
 });
 
-const errors = reactive({
-  password: '',
-  confirmPassword: ''
-});
-
 const { showToast } = useToast();
 
-/* ---------- computed ---------- */
-const hasErrors = computed(() =>
-    !form.newPassword ||
-    !form.confirmPassword ||
-    !!errors.password ||
-    !!errors.confirmPassword ||
-    form.newPassword !== form.confirmPassword
-);
+/* ---------- validazione ---------- */
+const REQUIRED_ORDER = ['newPassword', 'confirmPassword'] as const;
+type RequiredField = (typeof REQUIRED_ORDER)[number];
 
-/* ---------- methods ---------- */
-const isStrongPassword = (p: string) =>
-    /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(p);
-
-const errorClass = (field: keyof typeof errors) => ({
-  'ion-invalid': !!errors[field]
-});
-
-const validatePassword = () => {
-  errors.password = '';
-  errors.confirmPassword = '';
-
-  if (form.newPassword && !isStrongPassword(form.newPassword)) {
-    errors.password = 'Must include uppercase, lowercase, number, and symbol';
-  }
-
-  if (form.confirmPassword && form.newPassword !== form.confirmPassword) {
-    errors.confirmPassword = 'Passwords do not match';
-  }
-};
+const { errors, errorFor, fieldClass, validateOnSubmit } =
+    useFormValidation<RequiredField>(() => collectErrors<RequiredField>([
+      {
+        field: 'newPassword',
+        invalid: isBlank(form.newPassword),
+        message: requiredMessage('New password')
+      },
+      {
+        field: 'newPassword',
+        invalid: !isStrongPassword(form.newPassword),
+        message: PASSWORD_ERROR
+      },
+      {
+        field: 'confirmPassword',
+        invalid: isBlank(form.confirmPassword),
+        message: 'Repeat the new password to confirm it'
+      },
+      {
+        field: 'confirmPassword',
+        invalid: !isBlank(form.confirmPassword) && form.newPassword !== form.confirmPassword,
+        message: 'The two passwords do not match'
+      }
+    ]), REQUIRED_ORDER);
 
 /* ---------- password reset ---------- */
 async function handleResetPassword() {
   try {
-    validatePassword();
-
-    if (hasErrors.value) {
-      await showToast('Please correct the form errors', 'danger');
+    if (!(await validateOnSubmit())) {
+      await showToast(errorSummary(errors.value), 'danger');
       return;
     }
 
@@ -227,14 +230,6 @@ ion-input {
 .password-item ion-icon.toggle-eye {
   cursor: pointer;
   font-size: var(--font-lg);
-}
-
-.error-message {
-  color: var(--ion-color-danger);
-  font-size: var(--font-sm);
-  padding-left: var(--space-4);
-  padding-top: var(--space-1);
-  margin-bottom: var(--space-4);
 }
 
 ion-icon.input-icon {

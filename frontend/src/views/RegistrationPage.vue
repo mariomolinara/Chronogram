@@ -32,42 +32,50 @@
         </div>
 
         <div class="form-wrapper">
+          <FormLegend />
+
           <ion-list lines="none">
-            <ion-item :class="errorClass('name')" class="glass-input">
+            <ion-item :class="fieldClass('name')" class="glass-input" data-field="name">
               <ion-icon slot="start" :icon="personOutline" class="input-icon" />
               <ion-input
                   v-model="form.name"
-                  label="Name"
                   label-placement="floating"
                   type="text"
-                  :aria-label="'Name'"
                   autocomplete="given-name"
-              />
+                  :aria-invalid="!!errorFor('name')"
+              >
+                <div slot="label">Name <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('name')" />
 
-            <ion-item :class="errorClass('surname')" class="glass-input">
+            <ion-item :class="fieldClass('surname')" class="glass-input" data-field="surname">
               <ion-icon slot="start" :icon="personOutline" class="input-icon" />
               <ion-input
                   v-model="form.surname"
-                  label="Surname"
                   label-placement="floating"
                   type="text"
-                  :aria-label="'Surname'"
                   autocomplete="family-name"
-              />
+                  :aria-invalid="!!errorFor('surname')"
+              >
+                <div slot="label">Surname <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('surname')" />
 
-            <ion-item :class="errorClass('address')" class="glass-input">
+            <ion-item :class="fieldClass('address')" class="glass-input" data-field="address">
               <ion-icon slot="start" :icon="locationOutline" class="input-icon" />
               <ion-input
                   v-model="form.address"
-                  label="Address"
                   label-placement="floating"
                   type="text"
-                  :aria-label="'Address'"
                   autocomplete="street-address"
-              />
+                  :aria-invalid="!!errorFor('address')"
+              >
+                <div slot="label">Address <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('address')" />
 
             <ion-item class="glass-input">
               <ion-icon slot="start" :icon="callOutline" class="input-icon" />
@@ -81,29 +89,32 @@
               />
             </ion-item>
 
-            <ion-item :class="errorClass('email')" class="glass-input">
+            <ion-item :class="fieldClass('email')" class="glass-input" data-field="email">
               <ion-icon slot="start" :icon="mailOutline" class="input-icon" />
               <ion-input
                   v-model="form.email"
-                  label="Email"
                   label-placement="floating"
                   type="email"
-                  :aria-label="'Email'"
                   autocomplete="email"
-              />
+                  :aria-invalid="!!errorFor('email')"
+              >
+                <div slot="label">Email <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('email')" />
 
-            <ion-item :class="errorClass('password')" class="glass-input password-item">
+            <ion-item :class="fieldClass('password')" class="glass-input password-item" data-field="password">
               <ion-icon slot="start" :icon="keyOutline" class="input-icon" />
               <ion-input
                   v-model="form.password"
                   :type="showPassword ? 'text' : 'password'"
-                  label="Password"
                   label-placement="floating"
-                  :aria-label="'Password'"
                   autocomplete="new-password"
                   :helper-text="PASSWORD_HINT"
-              />
+                  :aria-invalid="!!errorFor('password')"
+              >
+                <div slot="label">Password <RequiredMark /></div>
+              </ion-input>
               <ion-icon
                   slot="end"
                   :icon="showPassword ? eyeOffOutline : eyeOutline"
@@ -116,6 +127,7 @@
                   @keydown.space.prevent="showPassword = !showPassword"
               />
             </ion-item>
+            <FieldError :message="errorFor('password')" />
 
             <ion-item
                 class="glass-input"
@@ -155,9 +167,11 @@
                 <ion-button expand="block" class="pill-button gradient-outline" @click="router.back()">Cancel</ion-button>
               </ion-col>
               <ion-col size="5">
+                <!-- Premibile anche con il form incompleto: è la pressione a
+                     dire quali campi mancano e come compilarli. -->
                 <ion-button
                     expand="block"
-                    :disabled="isLoading || hasErrors"
+                    :disabled="isLoading"
                     class="pill-button gradient-outline"
                     @click="handleRegister"
                 >
@@ -235,6 +249,14 @@ import {
 import dayjs from 'dayjs';
 import { api, apiErrorMessage } from '@/composables/useApi';
 import { useToast } from '@/composables/useToast';
+import {
+  collectErrors, errorSummary, isBlank, isStrongPassword, isValidEmail,
+  requiredMessage, useFormValidation,
+  EMAIL_ERROR, PASSWORD_ERROR, PASSWORD_HINT
+} from '@/composables/useValidation';
+import RequiredMark from '@/components/RequiredMark.vue';
+import FieldError from '@/components/FieldError.vue';
+import FormLegend from '@/components/FormLegend.vue';
 
 /**
  * Esito della registrazione restituito dal backend in `data`: `ACTIVE` quando
@@ -250,10 +272,6 @@ interface RegisterResponse {
 }
 
 /* ---------- costanti ---------- */
-/** Regola applicata da `isStrongPassword`: senza indicarla il pulsante Register
- *  resta disabilitato e l'utente non ha modo di capire quale campo manca. */
-const PASSWORD_HINT = 'At least 8 characters, with upper and lower case, a digit and a symbol.';
-
 /** Intervallo ragionevole per una data di nascita: nessuna data futura. */
 const MIN_BIRTHDAY = '1900-01-01';
 const MAX_BIRTHDAY = dayjs().format('YYYY-MM-DD');
@@ -279,27 +297,21 @@ const formattedBirthday = computed(() => form.birthday);
 const birthdayAriaLabel = computed(() =>
     form.birthday ? `Birthday, ${form.birthday}` : 'Birthday, not set'
 );
-const hasErrors = computed(() =>
-    !form.name.trim()       ||
-    !form.surname.trim()    ||
-    !form.address.trim()    ||
-    !isValidEmail(form.email) ||
-    !isStrongPassword(form.password)
-);
+/* ---------- validazione ---------- */
+/** Campi obbligatori, nell'ordine in cui compaiono nella form. */
+const REQUIRED_ORDER = ['name', 'surname', 'address', 'email', 'password'] as const;
+type RequiredField = (typeof REQUIRED_ORDER)[number];
 
-/* ---------- helpers ---------- */
-const isValidEmail = (e: string) =>
-    /^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/.test(e);
-
-const isStrongPassword = (p: string) =>
-    /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(p);
-
-const errorClass = (f: keyof typeof form) => ({
-  'ion-invalid':
-      (f === 'email'    && form.email    && !isValidEmail(form.email)) ||
-      (f === 'password' && form.password && !isStrongPassword(form.password)) ||
-      (!(form[f] as string).trim() && ['name', 'surname', 'address'].includes(f))
-});
+const { errors, errorFor, fieldClass, validateOnSubmit } =
+    useFormValidation<RequiredField>(() => collectErrors<RequiredField>([
+      { field: 'name', invalid: isBlank(form.name), message: requiredMessage('Name') },
+      { field: 'surname', invalid: isBlank(form.surname), message: requiredMessage('Surname') },
+      { field: 'address', invalid: isBlank(form.address), message: requiredMessage('Address') },
+      { field: 'email', invalid: isBlank(form.email), message: requiredMessage('Email') },
+      { field: 'email', invalid: !isValidEmail(form.email), message: EMAIL_ERROR },
+      { field: 'password', invalid: isBlank(form.password), message: requiredMessage('Password') },
+      { field: 'password', invalid: !isStrongPassword(form.password), message: PASSWORD_ERROR }
+    ]), REQUIRED_ORDER);
 
 const openBirthdayModal = () => {
   isBirthdayOpen.value = true;
@@ -333,8 +345,8 @@ const PENDING_FALLBACK =
     + 'sign in; we will email you as soon as that happens.';
 
 async function handleRegister() {
-  if (hasErrors.value) {
-    showToast('Please correct the highlighted fields.', 'danger');
+  if (!(await validateOnSubmit())) {
+    await showToast(errorSummary(errors.value), 'danger');
     return;
   }
 

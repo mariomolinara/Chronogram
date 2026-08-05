@@ -7,30 +7,38 @@
         </div>
 
         <div class="form-wrapper">
+          <FormLegend />
+
           <ion-list lines="none">
-            <ion-item class="glass-input">
+            <ion-item :class="fieldClass('email')" class="glass-input" data-field="email">
               <ion-icon :icon="personOutline" class="input-icon" />
               <ion-input
-                  label="Email"
                   label-placement="floating"
                   placeholder="Insert your email"
                   type="email"
                   autocomplete="email"
                   v-model="email"
-              ></ion-input>
+                  :aria-invalid="!!errorFor('email')"
+              >
+                <div slot="label">Email <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('email')" />
 
-            <ion-item class="glass-input">
+            <ion-item :class="fieldClass('password')" class="glass-input" data-field="password">
               <ion-icon :icon="keyOutline" class="input-icon" />
               <ion-input
-                  label="Password"
                   label-placement="floating"
                   type="password"
                   placeholder="Insert your password"
                   autocomplete="current-password"
                   v-model="password"
-              ></ion-input>
+                  :aria-invalid="!!errorFor('password')"
+              >
+                <div slot="label">Password <RequiredMark /></div>
+              </ion-input>
             </ion-item>
+            <FieldError :message="errorFor('password')" />
           </ion-list>
 
           <!--
@@ -84,6 +92,12 @@ import {
 } from '@ionic/vue';
 import { alertCircleOutline, personOutline, keyOutline } from 'ionicons/icons';
 import { apiErrorMessage } from '@/composables/useApi';
+import {
+  collectErrors, errorSummary, isBlank, requiredMessage, useFormValidation
+} from '@/composables/useValidation';
+import RequiredMark from '@/components/RequiredMark.vue';
+import FieldError from '@/components/FieldError.vue';
+import FormLegend from '@/components/FormLegend.vue';
 
 /** Oltre questa lunghezza il messaggio non si legge in un toast breve. */
 const LONG_MESSAGE_LENGTH = 45;
@@ -105,13 +119,22 @@ const password = ref('');
 // mai presentata).
 const { showToast: presentToast } = useToast();
 
+/* ---------- validazione ----------
+   Qui si controlla solo la presenza: il formato dell'indirizzo lo giudica il
+   backend (l'utenza amministrativa può non essere un'email) e un controllo
+   client troppo severo chiuderebbe fuori chi ha credenziali valide. */
+const REQUIRED_ORDER = ['email', 'password'] as const;
+type RequiredField = (typeof REQUIRED_ORDER)[number];
+
+const { errors, errorFor, fieldClass, validateOnSubmit } =
+    useFormValidation<RequiredField>(() => collectErrors<RequiredField>([
+      { field: 'email', invalid: isBlank(email.value), message: requiredMessage('Email') },
+      { field: 'password', invalid: isBlank(password.value), message: requiredMessage('Password') }
+    ]), REQUIRED_ORDER);
+
 const handleLogin = async () => {
-  if (!email.value.trim()) {
-    presentToast('Please enter your email');
-    return;
-  }
-  if (!password.value.trim()) {
-    presentToast('Please enter your password');
+  if (!(await validateOnSubmit())) {
+    await presentToast(errorSummary(errors.value), 'danger');
     return;
   }
 

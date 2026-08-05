@@ -54,14 +54,30 @@
           </ion-card-title>
         </ion-card-header>
         <ion-card-content>
-          <ion-item>
-            <ion-label position="stacked">Subject</ion-label>
-            <ion-input v-model="subject" placeholder="Enter subject" required></ion-input>
+          <FormLegend />
+
+          <ion-item :class="fieldClass('subject')" data-field="subject">
+            <ion-label position="stacked">Subject <RequiredMark /></ion-label>
+            <ion-input
+                v-model="subject"
+                placeholder="Enter subject"
+                required
+                :aria-invalid="!!errorFor('subject')"
+            ></ion-input>
           </ion-item>
-          <ion-item>
-            <ion-label position="stacked">Message</ion-label>
-            <ion-textarea v-model="message" placeholder="Describe your issue" auto-grow></ion-textarea>
+          <FieldError :message="errorFor('subject')" />
+
+          <ion-item :class="fieldClass('message')" data-field="message">
+            <ion-label position="stacked">Message <RequiredMark /></ion-label>
+            <ion-textarea
+                v-model="message"
+                placeholder="Describe your issue"
+                auto-grow
+                :aria-invalid="!!errorFor('message')"
+            ></ion-textarea>
           </ion-item>
+          <FieldError :message="errorFor('message')" />
+
           <ion-button expand="block" class="send-button" @click="sendMessage">
             Send Message
           </ion-button>
@@ -77,13 +93,21 @@ import {
   IonPage, IonHeader, IonToolbar, IonTitle, IonContent, IonItem,
   IonInput, IonTextarea, IonButton, IonLabel, IonCard, IonCardContent,
   IonCardHeader, IonCardTitle, IonIcon, IonAccordionGroup, IonAccordion,
-  IonButtons, toastController
+  IonButtons
 } from '@ionic/vue';
 import { searchOutline, settingsOutline } from 'ionicons/icons';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useToast } from '@/composables/useToast';
+import {
+  collectErrors, errorSummary, isBlank, useFormValidation
+} from '@/composables/useValidation';
+import RequiredMark from '@/components/RequiredMark.vue';
+import FieldError from '@/components/FieldError.vue';
+import FormLegend from '@/components/FormLegend.vue';
 
 const router = useRouter();
+const { showToast } = useToast();
 
 // Redirect to Settings
 function goTo(name: string) {
@@ -110,28 +134,40 @@ const faq = [
   }
 ];
 
+/* ---------- validazione ---------- */
+const REQUIRED_ORDER = ['subject', 'message'] as const;
+type RequiredField = (typeof REQUIRED_ORDER)[number];
+
+const { errors, errorFor, fieldClass, validateOnSubmit, reset: resetValidation } =
+    useFormValidation<RequiredField>(() => collectErrors<RequiredField>([
+      {
+        field: 'subject',
+        invalid: isBlank(subject.value),
+        message: 'Subject is required: summarise the issue in a few words'
+      },
+      {
+        field: 'message',
+        invalid: isBlank(message.value),
+        message: 'Message is required: describe what happened and what you expected'
+      }
+    ]), REQUIRED_ORDER);
+
 // Handle message submission and show toast
+// NOTA: il messaggio non viene ancora inviato da nessuna parte (manca l'endpoint
+// lato backend): qui resta un `console.log`.
 async function sendMessage() {
-  if (!subject.value.trim() || !message.value.trim()) {
-    const toast = await toastController.create({
-      message: 'Please fill in both subject and message.',
-      duration: 2000,
-      color: 'danger'
-    });
-    return toast.present();
+  if (!(await validateOnSubmit())) {
+    await showToast(errorSummary(errors.value), 'danger');
+    return;
   }
 
   console.log('Message sent:', { subject: subject.value, message: message.value });
 
   subject.value = '';
   message.value = '';
+  resetValidation();
 
-  const toast = await toastController.create({
-    message: 'Your message has been sent!',
-    duration: 2000,
-    color: 'success'
-  });
-  toast.present();
+  await showToast('Your message has been sent!', 'success');
 }
 </script>
 
