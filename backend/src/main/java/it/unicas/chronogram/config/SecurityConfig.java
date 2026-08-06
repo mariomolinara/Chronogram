@@ -18,6 +18,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Stateless security configuration: public auth endpoints, JWT-protected
@@ -26,6 +27,19 @@ import java.util.List;
  */
 @Configuration
 public class SecurityConfig {
+
+    /**
+     * Origins the packaged mobile app calls from. Capacitor serves the bundled
+     * frontend from a fixed local origin - {@code https://localhost} on Android,
+     * {@code capacitor://localhost} on iOS - so these identify the application
+     * itself, not a deployment. They live in code rather than in
+     * {@code CORS_ALLOWED_ORIGINS} because every environment would have to
+     * remember to add them, and the failure mode is an app whose login dies on
+     * the preflight ("Invalid CORS request") while the same build works in any
+     * browser, where the request is same-origin and CORS never runs.
+     */
+    private static final List<String> MOBILE_APP_ORIGINS =
+            List.of("https://localhost", "capacitor://localhost");
 
     private final ChronogramProperties properties;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -86,7 +100,12 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        List<String> allowedOrigins = properties.getSecurity().getCors().getAllowedOrigins();
+        // Environment allowlist (web origins) plus the fixed app origins above.
+        List<String> allowedOrigins = Stream.concat(
+                        properties.getSecurity().getCors().getAllowedOrigins().stream(),
+                        MOBILE_APP_ORIGINS.stream())
+                .distinct()
+                .toList();
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));

@@ -96,6 +96,31 @@ class SecurityConfigCorsTest {
     }
 
     @Test
+    void preflightFromTheMobileAppOriginIsAllowedWithoutConfiguration() throws Exception {
+        // The Capacitor WebView calls from https://localhost (Android). That origin
+        // is compiled into SecurityConfig, NOT into the per-environment allowlist
+        // (which here contains only ALLOWED_ORIGIN): if this test fails, the web
+        // keeps working but the installed app cannot even log in.
+        mockMvc.perform(options("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "https://localhost")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://localhost"));
+    }
+
+    @Test
+    void preflightFromTheIosAppOriginIsAllowedWithoutConfiguration() throws Exception {
+        // Same contract for the iOS scheme, so a future iOS build does not
+        // rediscover this bug.
+        mockMvc.perform(options("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "capacitor://localhost")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "capacitor://localhost"));
+    }
+
+    @Test
     void preflightFromForeignOriginIsRejected() throws Exception {
         mockMvc.perform(options("/api/activities/list")
                         .header(HttpHeaders.ORIGIN, FOREIGN_ORIGIN)
