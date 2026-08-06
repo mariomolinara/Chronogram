@@ -33,8 +33,8 @@ def hasReleaseSigning  = storeFileValue != null && storePasswordValue != null &&
                          keyAliasValue != null && keyPasswordValue != null
 
 android {
-    namespace "it.unicas.chronogram"
-    compileSdk rootProject.ext.compileSdkVersion
+    namespace = "it.unicas.aidalab.chronogram"
+    compileSdk = rootProject.ext.compileSdkVersion
     signingConfigs {
         release {
             if (hasReleaseSigning) {
@@ -46,7 +46,7 @@ android {
         }
     }
     defaultConfig {
-        applicationId "it.unicas.chronogram"
+        applicationId "it.unicas.aidalab.chronogram"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -55,7 +55,7 @@ android {
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
     buildTypes {

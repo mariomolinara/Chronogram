@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'it.unicas.chronogram',
+  appId: 'it.unicas.aidalab.chronogram',
   appName: 'Chronogram',
   webDir: 'dist',
   // Production hardening: keep the WebView content confined to the app's own

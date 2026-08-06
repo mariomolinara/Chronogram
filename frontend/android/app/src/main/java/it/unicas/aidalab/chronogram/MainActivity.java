@@ -1,4 +1,4 @@
-package it.unicas.chronogram;
+package it.unicas.aidalab.chronogram;
 
 import com.getcapacitor.BridgeActivity;
 

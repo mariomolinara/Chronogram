@@ -3,6 +3,26 @@
 **Data del piano: 6 agosto 2026.** Basato sull'ispezione dello stato reale del repo
 e sulla verifica dei requisiti Google Play correnti (fonti in fondo).
 
+> **AGGIORNAMENTO — 6 agosto 2026 (sera).** Le voci tecniche più urgenti sono
+> state RISOLTE dopo la stesura del piano; le sezioni segnate ✅ qui sotto vanno
+> lette come storia, non come lavoro da fare:
+>
+> - ✅ **applicationId deciso e applicato: `it.unicas.aidalab.chronogram`**
+>   (namespace, MainActivity, strings.xml inclusi). La §2.1 è superata.
+> - ✅ **compileSdk/targetSdk 36, minSdk 24** — requisito Play del 31/08/2026
+>   soddisfatto. Stack aggiornato a **Capacitor 8.5 + AGP 8.13.0 + Gradle
+>   8.14.3** (AGP 9 non è supportato da Capacitor). Le §1.2 e §2.5 sono superate.
+> - ✅ SDK platform 36, platform-tools, emulator e system image Android 16
+>   installati; `ANDROID_HOME`/`ANDROID_SDK_ROOT` impostate; AVD `Pixel_A16`
+>   creato. La §1 è completata.
+> - ✅ `google-services.json` eliminato (era legato al vecchio package, Firebase
+>   non in uso; procedura di riattivazione in `frontend/android/RELEASE.md`).
+> - ✅ `RELEASE.md` corretto (§2.7 completata) e APK di debug collaudato con la
+>   nuova identità (`aapt2 badging` verificato).
+> - Restano attuali: firma/keystore (§3), account Play Console (§5), compliance
+>   e listing (§6), testing (§7), rilascio (§8). L'utente ha scelto di fermarsi
+>   all'APK per ora e valutare l'account Play Console in futuro.
+
 ---
 
 ## 0. Stato reale verificato del repo
@@ -120,14 +140,15 @@ con terze parti** (§6.3).
 
 ## Blocchi critici, in ordine di urgenza
 
-1. **targetSdk 36 entro il 31 agosto 2026** (25 giorni dalla data del piano).
-   L'app è a 35, e AGP 8.7.2 non può compilare con `compileSdk 36`.
-2. **Endpoint di cancellazione account** funzionante in produzione (policy User Data).
+1. ✅ RISOLTO — **targetSdk 36 entro il 31 agosto 2026**: fatto (Capacitor 8 +
+   AGP 8.13, compile/targetSdk 36).
+2. **Endpoint di cancellazione account** funzionante in produzione (policy User
+   Data): endpoint deployato; resta il link web pubblico di richiesta (§6.4).
 3. **Privacy policy non pubblicata** su un URL pubblico (esiste solo come file locale).
 4. **Nessun keystore di release** generato.
-5. **Decisione irreversibile sull'`applicationId`** da prendere adesso.
+5. ✅ RISOLTO — **`applicationId`**: deciso e applicato `it.unicas.aidalab.chronogram`.
 6. **Account developer**: senza account verificato non si carica nulla, ed è la
-   voce con il lead time più lungo. **Da avviare subito, in parallelo a tutto.**
+   voce con il lead time più lungo. Da avviare quando si deciderà di pubblicare.
 
 ---
 
