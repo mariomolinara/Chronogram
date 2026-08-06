@@ -2,10 +2,13 @@
   <ion-page>
     <ion-header>
       <ion-toolbar>
-        <!-- Go back to Settings -->
+        <!-- Freccia e non l'ingranaggio di Settings: l'icona di una destinazione
+             in alto a sinistra non si legge come "indietro", e l'utente non
+             trovava il modo di uscire dalla pagina. Stesso controllo di
+             EditProfile.vue. -->
         <ion-buttons slot="start">
-          <ion-button @click="goTo('Settings')">
-            <ion-icon :icon="settingsOutline" slot="icon-only" />
+          <ion-button aria-label="Back to settings" @click="goBack">
+            <ion-icon slot="icon-only" :icon="arrowBackOutline" />
           </ion-button>
         </ion-buttons>
         <ion-title>Support</ion-title>
@@ -107,7 +110,7 @@ import {
   IonCardHeader, IonCardTitle, IonIcon, IonAccordionGroup, IonAccordion,
   IonButtons, IonSpinner
 } from '@ionic/vue';
-import { searchOutline, settingsOutline } from 'ionicons/icons';
+import { searchOutline, arrowBackOutline } from 'ionicons/icons';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, apiErrorMessage } from '@/composables/useApi';
@@ -122,9 +125,9 @@ import FormLegend from '@/components/FormLegend.vue';
 const router = useRouter();
 const { showToast } = useToast();
 
-// Redirect to Settings
-function goTo(name: string) {
-  router.push({ name });
+/** Ritorno a Settings, da cui si entra nella pagina di supporto. */
+function goBack() {
+  router.push({ name: 'Settings' });
 }
 
 /** Limiti di `SupportMessageRequest` lato backend: la UI li rispecchia. */

@@ -175,3 +175,21 @@ export async function updateProfile(form: ProfileForm): Promise<ProfileForm> {
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
   await api.post('/api/profile/change-password', { currentPassword, newPassword });
 }
+
+/**
+ * Cancella definitivamente l'account dell'utente autenticato.
+ *
+ * Contratto del backend: `POST /api/profile/delete-account` con corpo
+ * `{ reasons: string[] }` — la lista è facoltativa e serve solo a capire perché
+ * si abbandona l'app. Al ritorno l'account non esiste più: il token che il
+ * client ha in mano non vale più nulla, quindi chi chiama DEVE chiudere la
+ * sessione subito dopo.
+ *
+ * La normalizzazione sta qui e non nella vista: voci vuote o con soli spazi
+ * sarebbero rumore nelle statistiche, e "nessun motivo selezionato" viaggia come
+ * array vuoto e non come `null`, perché il campo è opzionale, non nullable.
+ */
+export async function deleteAccount(reasons: readonly string[] = []): Promise<void> {
+  const cleaned = reasons.map((reason) => reason.trim()).filter((reason) => reason.length > 0);
+  await api.post('/api/profile/delete-account', { reasons: cleaned });
+}

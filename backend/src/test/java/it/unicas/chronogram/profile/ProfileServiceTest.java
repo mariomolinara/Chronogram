@@ -1,9 +1,12 @@
 package it.unicas.chronogram.profile;
 
 import it.unicas.chronogram.common.exception.ApiExceptions.ResourceNotFoundException;
+import it.unicas.chronogram.common.exception.ApiExceptions.ServiceException;
 import it.unicas.chronogram.common.exception.ApiExceptions.ValidationException;
+import it.unicas.chronogram.domain.Role;
 import it.unicas.chronogram.domain.UserAuth;
 import it.unicas.chronogram.domain.UserProfile;
+import it.unicas.chronogram.mail.EmailService;
 import it.unicas.chronogram.profile.dto.ChangePasswordRequest;
 import it.unicas.chronogram.profile.dto.ProfileResponse;
 import it.unicas.chronogram.profile.dto.UpdateProfileRequest;
@@ -13,24 +16,32 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for self-service profile and password management: what is stored
- * for a given edit, which inputs are refused, and the guarantee that the email
- * behind the account is never touched from here.
+ * Unit tests for self-service profile, password and account management: what is
+ * stored for a given edit, which inputs are refused, the guarantee that the email
+ * behind the account is never touched from here, and which accounts may erase
+ * themselves.
  */
 @ExtendWith(MockitoExtension.class)
 class ProfileServiceTest {
@@ -41,12 +52,14 @@ class ProfileServiceTest {
     @Mock private UserAuthRepository userAuthRepository;
     @Mock private UserProfileRepository userProfileRepository;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private EmailService emailService;
 
     private ProfileService profileService;
 
     @BeforeEach
     void setUp() {
-        profileService = new ProfileService(userAuthRepository, userProfileRepository, passwordEncoder);
+        profileService = new ProfileService(
+                userAuthRepository, userProfileRepository, passwordEncoder, emailService);
     }
 
     private UserAuth account() {
@@ -219,5 +232,130 @@ class ProfileServiceTest {
                 .hasMessageContaining("must differ");
 
         verify(userAuthRepository, never()).save(any());
+    }
+
+    // ---- deletion ----
+
+    /**
+     * The account row is the only thing deleted: the profile, the activities, the
+     * login history and any reset token go with it through the foreign keys, so a
+     * per-table delete here would be duplicating what the schema already
+     * guarantees. The flush before the email is what makes the confirmation
+     * describe a deletion the database has accepted.
+     */
+    @Test
+    void deleteAccountRemovesTheAccountAndThenConfirmsByEmail() {
+        UserAuth stored = account();
+        when(userAuthRepository.findById(USER_ID)).thenReturn(Optional.of(stored));
+
+        profileService.deleteAccount(USER_ID, List.of("Non mi serve piu", "Privacy"));
+
+        InOrder order = inOrder(userAuthRepository, emailService);
+        order.verify(userAuthRepository).delete(stored);
+        order.verify(userAuthRepository).flush();
+        order.verify(emailService).sendAccountSelfDeletedEmail("ada@unicas.it");
+    }
+
+    /** No reason given is a perfectly valid deletion, not a validation error. */
+    @Test
+    void deleteAccountWorksWithoutAnyReason() {
+        UserAuth stored = account();
+        when(userAuthRepository.findById(USER_ID)).thenReturn(Optional.of(stored));
+
+        profileService.deleteAccount(USER_ID, List.of());
+
+        verify(userAuthRepository).delete(stored);
+        verify(emailService).sendAccountSelfDeletedEmail("ada@unicas.it");
+    }
+
+    /**
+     * A reason crafted to forge log lines is neutralised rather than refused: the
+     * user's business is leaving, not passing a syntax check.
+     */
+    @Test
+    void deleteAccountAcceptsReasonsCarryingControlCharacters() {
+        UserAuth stored = account();
+        when(userAuthRepository.findById(USER_ID)).thenReturn(Optional.of(stored));
+
+        assertThatCode(() -> profileService.deleteAccount(USER_ID,
+                List.of("boring\r\nINFO forged log line", "x".repeat(500))))
+                .doesNotThrowAnyException();
+
+        verify(userAuthRepository).delete(stored);
+    }
+
+    /**
+     * The mail is a courtesy attached to a deletion already committed: an SMTP
+     * outage must not resurrect an account the user has been told is gone.
+     */
+    @Test
+    void deleteAccountSucceedsEvenIfTheConfirmationCannotBeSent() {
+        UserAuth stored = account();
+        when(userAuthRepository.findById(USER_ID)).thenReturn(Optional.of(stored));
+        doThrow(new ServiceException("SMTP down")).when(emailService).sendAccountSelfDeletedEmail(anyString());
+
+        assertThatCode(() -> profileService.deleteAccount(USER_ID, List.of()))
+                .doesNotThrowAnyException();
+
+        verify(userAuthRepository).delete(stored);
+    }
+
+    /**
+     * The built-in administrator is provisioned from configuration and holds the
+     * only way into the back office: it must not be able to delete itself, and
+     * nothing may be sent or removed when it tries.
+     */
+    @Test
+    void deleteAccountRefusesTheBuiltInAdministrator() {
+        UserAuth stored = account();
+        stored.setRole(Role.ADMIN);
+        stored.setSystemAccount(true);
+        when(userAuthRepository.findById(USER_ID)).thenReturn(Optional.of(stored));
+
+        assertThatThrownBy(() -> profileService.deleteAccount(USER_ID, List.of()))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("built-in administrator");
+
+        verify(userAuthRepository, never()).delete(any(UserAuth.class));
+        verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void deleteAccountRefusesTheLastRemainingAdministrator() {
+        UserAuth stored = account();
+        stored.setRole(Role.ADMIN);
+        when(userAuthRepository.findById(USER_ID)).thenReturn(Optional.of(stored));
+        when(userAuthRepository.countByRole(Role.ADMIN)).thenReturn(1L);
+
+        assertThatThrownBy(() -> profileService.deleteAccount(USER_ID, List.of()))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("only administrator");
+
+        verify(userAuthRepository, never()).delete(any(UserAuth.class));
+        verifyNoInteractions(emailService);
+    }
+
+    /** With a colleague left to run the back office, an administrator may leave. */
+    @Test
+    void deleteAccountLetsAnAdministratorLeaveWhenAnotherOneRemains() {
+        UserAuth stored = account();
+        stored.setRole(Role.ADMIN);
+        when(userAuthRepository.findById(USER_ID)).thenReturn(Optional.of(stored));
+        when(userAuthRepository.countByRole(Role.ADMIN)).thenReturn(2L);
+
+        profileService.deleteAccount(USER_ID, List.of());
+
+        verify(userAuthRepository).delete(stored);
+    }
+
+    /** An id from a valid token whose account is already gone: 404, not a crash. */
+    @Test
+    void deleteAccountOfAnAlreadyDeletedAccountIsReportedAsNotFound() {
+        when(userAuthRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> profileService.deleteAccount(USER_ID, List.of()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(emailService);
     }
 }

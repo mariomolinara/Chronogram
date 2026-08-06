@@ -32,12 +32,26 @@
 </template>
 
 <script setup lang="ts">
+// Import espliciti dei componenti Ionic usati nel template, come nelle altre
+// viste: senza registrazione il tag resta un custom element sconosciuto e
+// `ion-back-button` finisce per non renderizzare nulla di cliccabile.
+import {
+  IonPage, IonHeader, IonToolbar, IonButtons, IonBackButton, IonTitle,
+  IonContent, IonButton
+} from '@ionic/vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
+/**
+ * Passa alla raccolta dei motivi, dove avviene la cancellazione vera.
+ *
+ * Il nome della rotta è `DeleteReasons` (vedi `router/index.ts`): al singolare
+ * `router.push` non trovava alcuna rotta corrispondente e il tap moriva in
+ * silenzio, senza navigazione e senza errore visibile all'utente.
+ */
 const goToFeedback = () => {
-  router.push({ name: 'DeleteReason' })
+  router.push({ name: 'DeleteReasons' })
 }
 </script>
 

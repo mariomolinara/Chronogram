@@ -14,6 +14,7 @@ vi.mock('@/composables/useApi', () => ({
 
 import {
   changePassword,
+  deleteAccount,
   fetchProfile,
   formatBirthday,
   normalizeIsoDate,
@@ -192,5 +193,47 @@ describe('chiamate al backend', () => {
       currentPassword: 'Old1!pass',
       newPassword: 'New1!pass'
     })
+  })
+})
+
+/**
+ * La cancellazione non ha un annullamento: quello che conta qui è che il corpo
+ * sia esattamente quello concordato (`{ reasons: string[] }`) e che un errore
+ * arrivi al chiamante, perché è lui a decidere di NON chiudere la sessione
+ * quando l'account è ancora là.
+ */
+describe('deleteAccount', () => {
+  test('invia i motivi selezionati a POST /api/profile/delete-account', async () => {
+    post.mockResolvedValue({ data: { success: true, message: 'Account deleted' } })
+
+    await deleteAccount(["I'm not using the app.", 'Other.'])
+
+    expect(post).toHaveBeenCalledWith('/api/profile/delete-account', {
+      reasons: ["I'm not using the app.", 'Other.']
+    })
+  })
+
+  test('senza motivi manda una lista vuota, non null: il campo è opzionale', async () => {
+    post.mockResolvedValue({ data: { success: true } })
+
+    await deleteAccount()
+    await deleteAccount([])
+
+    expect(post).toHaveBeenNthCalledWith(1, '/api/profile/delete-account', { reasons: [] })
+    expect(post).toHaveBeenNthCalledWith(2, '/api/profile/delete-account', { reasons: [] })
+  })
+
+  test('scarta le voci vuote invece di sporcare le statistiche', async () => {
+    post.mockResolvedValue({ data: { success: true } })
+
+    await deleteAccount(['  Other.  ', '', '   '])
+
+    expect(post).toHaveBeenCalledWith('/api/profile/delete-account', { reasons: ['Other.'] })
+  })
+
+  test('propaga l errore: la sessione va chiusa solo a cancellazione riuscita', async () => {
+    post.mockRejectedValue(new Error('boom'))
+
+    await expect(deleteAccount(['Other.'])).rejects.toThrow('boom')
   })
 })

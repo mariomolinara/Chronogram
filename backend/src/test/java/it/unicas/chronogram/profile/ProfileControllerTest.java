@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -253,5 +254,105 @@ class ProfileControllerTest {
         mockMvc.perform(post("/api/profile/change-password").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---- POST /delete-account ----
+
+    @Test
+    void deleteAccountUsesThePrincipalIdAndForwardsTheReasons() throws Exception {
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("reasons", List.of("Too busy", " Privacy ")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // Trimmed on the way in; the id is the token's, never the client's.
+        verify(profileService).deleteAccount(eq(55), eq(List.of("Too busy", "Privacy")));
+    }
+
+    /**
+     * The three ways a client can decline to give a reason - no body at all, an
+     * object without the field, an empty list - all mean the same thing and none
+     * of them may stop the deletion.
+     */
+    @Test
+    void deleteAccountAcceptsAnAbsentEmptyOrReasonlessBody() throws Exception {
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reasons\":[]}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reasons\":null}"))
+                .andExpect(status().isOk());
+
+        verify(profileService, times(4)).deleteAccount(eq(55), eq(List.of()));
+    }
+
+    /** Blanks and nulls in the list are dropped rather than logged as empty quotes. */
+    @Test
+    void deleteAccountDropsBlankReasons() throws Exception {
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reasons\":[\"  \",null,\"Privacy\"]}"))
+                .andExpect(status().isOk());
+
+        verify(profileService).deleteAccount(eq(55), eq(List.of("Privacy")));
+    }
+
+    /** A refusal from the service (last administrator) is a 400 in the envelope. */
+    @Test
+    void deleteAccountReportsARefusalAsA400() throws Exception {
+        doThrow(new ValidationException("This is the only administrator account and cannot be deleted."))
+                .when(profileService).deleteAccount(eq(55), any());
+
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message")
+                        .value(org.hamcrest.Matchers.containsString("only administrator")));
+    }
+
+    /** An unbounded list of unbounded strings is refused before anything is deleted. */
+    @Test
+    void deleteAccountRejectsAnAbsurdNumberOfReasons() throws Exception {
+        List<String> tooMany = java.util.stream.IntStream.range(0, 21)
+                .mapToObj(i -> "reason " + i).toList();
+
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("reasons", tooMany))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+
+        verify(profileService, never()).deleteAccount(any(), any());
+    }
+
+    @Test
+    void deleteAccountRejectsAnOverlongReason() throws Exception {
+        mockMvc.perform(post("/api/profile/delete-account").with(authentication(principal())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("reasons", List.of("x".repeat(201))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+
+        verify(profileService, never()).deleteAccount(any(), any());
+    }
+
+    @Test
+    void deleteAccountRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/api/profile/delete-account").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(profileService, never()).deleteAccount(any(), any());
     }
 }

@@ -117,6 +117,26 @@ public class EmailService {
     }
 
     /**
+     * Confirms a deletion the account owner asked for themselves. Kept separate
+     * from {@link #sendAccountDeletedEmail(String, String)}: that one says an
+     * administrator did it, which would be plainly wrong here, and there is no
+     * administrator note to relay. It also doubles as the alarm bell if somebody
+     * else got hold of the session, which is why it is sent even though the user
+     * has just been told on screen that the account is gone.
+     */
+    public void sendAccountSelfDeletedEmail(String toEmail) {
+        String body = """
+                <p>Hello,</p>
+                <p>Your Chronogram account has been deleted at your own request, together with every \
+                activity you had recorded. This action cannot be undone and no copy of your data is kept.</p>
+                <p>If you did not ask for this, someone else had access to your session: please contact \
+                us so we can look into it.</p>
+                <p>Thank you for having used Chronogram,<br>The Chronogram Team</p>
+                """;
+        send(toEmail, "Your account has been deleted - Chronogram", "Account deleted", body);
+    }
+
+    /**
      * Nudges the administrator that somebody is waiting. Without it a pending
      * request is only noticed by whoever happens to open the back office.
      */

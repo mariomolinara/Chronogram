@@ -2,7 +2,11 @@ package it.unicas.chronogram.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import it.unicas.chronogram.domain.PasswordResetToken;
+import it.unicas.chronogram.repository.ActivityRepository;
+import it.unicas.chronogram.repository.PasswordResetTokenRepository;
 import it.unicas.chronogram.repository.UserAuthRepository;
+import it.unicas.chronogram.repository.UserProfileRepository;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
@@ -13,6 +17,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -22,6 +27,8 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -75,6 +82,12 @@ class AuthFlowIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private UserAuthRepository userAuthRepository;
+    @Autowired private UserProfileRepository userProfileRepository;
+    @Autowired private ActivityRepository activityRepository;
+    @Autowired private PasswordResetTokenRepository tokenRepository;
+    // login_event has no per-user finder (the admin stats only ever aggregate),
+    // and adding one just for a test would widen the repository for nothing.
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     // No real SMTP server: the account-lifecycle mails are simply swallowed,
     // and the support test stubs createMimeMessage() to inspect what was built.
@@ -325,6 +338,121 @@ class AuthFlowIntegrationTest {
                 .andExpect(status().isUnauthorized());
 
         verify(mailSender, times(1)).send(any(MimeMessage.class));
+    }
+
+    /**
+     * Self-service deletion against the real schema: the account row and every
+     * row that belongs to it disappear, and the token that ordered the deletion
+     * stops working - with a 401, not the 500 that a lookup of a vanished account
+     * would produce if the security chain assumed the row was still there.
+     */
+    @Test
+    void deletingTheAccountRemovesEveryOwnedRowAndInvalidatesTheToken() throws Exception {
+        // MimeMessageHelper needs a real message: the confirmation mail is part of
+        // the flow, and a null from the mocked sender would only be swallowed.
+        when(mailSender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
+
+        Map<String, Object> register = Map.of(
+                "name", "Edsger", "surname", "Dijkstra",
+                "email", "edsger@unicas.it", "password", "ShortestPath1!",
+                "birthday", "11-05-1930", "gender", "M", "address", "Rotterdam");
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(register)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("ACTIVE"));
+
+        // The login also writes the login_event row whose removal is asserted below.
+        String token = signIn("edsger@unicas.it", "ShortestPath1!");
+        int userId = userAuthRepository.findByEmailIgnoreCase("edsger@unicas.it").orElseThrow().getUserId();
+
+        // An activity of his own, so there is owned data in every child table.
+        MvcResult typesResult = mockMvc.perform(post("/api/activities/types")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn();
+        int activityTypeId = objectMapper.readTree(typesResult.getResponse().getContentAsString())
+                .get("data").get(0).get("activityTypeId").asInt();
+        mockMvc.perform(post("/api/activities/create")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "activityTypeId", activityTypeId, "durationMins", 30,
+                                "pleasantness", 1, "location", "Office", "costEuro", "0.00"))))
+                .andExpect(status().isOk());
+
+        // A pending reset token, written directly: the point is the FK, not the
+        // reset flow, and this is the row that would break the delete if the
+        // ordering were wrong.
+        PasswordResetToken pending = new PasswordResetToken();
+        pending.setUserId(userId);
+        pending.setSelector("selector-for-deletion");
+        pending.setVerifierHash("verifier-hash");
+        pending.setExpirationTime(LocalDateTime.now().plusMinutes(30));
+        pending.setCreatedAt(LocalDateTime.now());
+        tokenRepository.saveAndFlush(pending);
+
+        // Everything is in place before the deletion.
+        assertThat(userProfileRepository.findById(userId)).isPresent();
+        assertThat(activityRepository.summariseByUserIds(List.of(userId))).isNotEmpty();
+        assertThat(tokenRepository.findByUserId(userId)).isPresent();
+        assertThat(countRows("login_event", userId)).isPositive();
+
+        // The reasons are optional but sent here, as the client does.
+        mockMvc.perform(post("/api/profile/delete-account")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                Map.of("reasons", List.of("Non mi serve piu", "Privacy")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // The account and every row that belonged to it are gone.
+        assertThat(userAuthRepository.existsByEmailIgnoreCase("edsger@unicas.it")).isFalse();
+        assertThat(userProfileRepository.findById(userId)).isEmpty();
+        assertThat(activityRepository.summariseByUserIds(List.of(userId))).isEmpty();
+        assertThat(tokenRepository.findByUserId(userId)).isEmpty();
+        assertThat(tokenRepository.findBySelector("selector-for-deletion")).isEmpty();
+        assertThat(countRows("login_event", userId)).isZero();
+
+        // The confirmation went to the address the account had.
+        ArgumentCaptor<MimeMessage> sent = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(mailSender).send(sent.capture());
+        assertThat(sent.getValue().getAllRecipients()[0].toString()).isEqualTo("edsger@unicas.it");
+
+        // The token still parses, but names nobody: 401 on every protected route.
+        mockMvc.perform(get("/api/profile/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+        mockMvc.perform(post("/api/activities/list")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/profile/delete-account")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        // And the old credentials no longer sign anyone in.
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                Map.of("email", "edsger@unicas.it", "password", "ShortestPath1!"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(false));
+
+        // The address is free again, which nothing but a real deletion allows.
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(register)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    private long countRows(String table, int userId) {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE user_id = ?", Long.class, userId);
+        return count == null ? 0L : count;
     }
 
     /** Signs in and returns the issued token, failing the test if none was. */
