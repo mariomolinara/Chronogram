@@ -7,8 +7,9 @@
         </div>
 
         <div class="form-wrapper">
-          <FormLegend />
-
+          <!-- Niente legenda né asterischi: con due soli campi, entrambi
+               obbligatori, segnalarlo a priori è ridondante. L'obbligatorietà
+               emerge dai messaggi di errore al click su Login. -->
           <ion-list lines="none">
             <ion-item :class="fieldClass('email')" class="glass-input" data-field="email">
               <ion-icon :icon="personOutline" class="input-icon" />
@@ -20,7 +21,7 @@
                   v-model="email"
                   :aria-invalid="!!errorFor('email')"
               >
-                <div slot="label">Email <RequiredMark /></div>
+                <div slot="label">Email</div>
               </ion-input>
             </ion-item>
             <FieldError :message="errorFor('email')" />
@@ -35,7 +36,7 @@
                   v-model="password"
                   :aria-invalid="!!errorFor('password')"
               >
-                <div slot="label">Password <RequiredMark /></div>
+                <div slot="label">Password</div>
               </ion-input>
             </ion-item>
             <FieldError :message="errorFor('password')" />
@@ -73,6 +74,15 @@
               </ion-col>
             </ion-row>
           </ion-grid>
+
+          <!-- Raggiungibile anche senza account: la rotta About è pubblica. -->
+          <ion-button
+              fill="clear"
+              class="about-link"
+              @click="goToAbout"
+          >
+            About Chronogram
+          </ion-button>
         </div>
       </div>
 
@@ -95,9 +105,7 @@ import { apiErrorMessage } from '@/composables/useApi';
 import {
   collectErrors, errorSummary, isBlank, requiredMessage, useFormValidation
 } from '@/composables/useValidation';
-import RequiredMark from '@/components/RequiredMark.vue';
 import FieldError from '@/components/FieldError.vue';
-import FormLegend from '@/components/FormLegend.vue';
 
 /** Oltre questa lunghezza il messaggio non si legge in un toast breve. */
 const LONG_MESSAGE_LENGTH = 45;
@@ -175,6 +183,10 @@ const goToRegistration = () => {
 const handleForgotPassword = () => {
   router.push({ name: 'ForgotPassword' });
 };
+
+const goToAbout = () => {
+  router.push({ name: 'About' });
+};
 </script>
 
 <style scoped>
@@ -241,5 +253,12 @@ const handleForgotPassword = () => {
   --padding-start: 0;
   --padding-end: 0;
   height: auto;
+}
+.about-link {
+  --color: var(--subtext0);
+  font-size: 0.8rem;
+  text-transform: none;
+  font-weight: 500;
+  margin-top: var(--space-4);
 }
 </style>

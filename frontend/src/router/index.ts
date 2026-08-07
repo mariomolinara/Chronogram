@@ -14,7 +14,8 @@ const PUBLIC_ROUTE_NAMES: ReadonlySet<string> = new Set([
   'Login',
   'Register',
   'ForgotPassword',
-  'ResetPassword'
+  'ResetPassword',
+  'About'
 ]);
 
 const isPublicRoute = (route: RouteLocationNormalized): boolean =>
@@ -88,6 +89,11 @@ const routes: Array<RouteRecordRaw> = [
     path: '/support',
     name: 'Support',
     component: () => import('@/views/SupportPage.vue')
+  },
+  {
+    path: '/about',
+    name: 'About',
+    component: () => import('@/views/AboutPage.vue')
   },
   {
     path: '/change-password',
