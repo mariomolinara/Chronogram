@@ -4,6 +4,11 @@
          senza introdurre una barra opaca sopra `.user-info`. -->
     <ion-header class="home-header">
       <ion-toolbar class="home-toolbar">
+        <ion-buttons slot="start">
+          <ion-button class="tap-target" aria-label="About Chronogram" @click="goToAbout">
+            <ion-icon :icon="informationCircleOutline" aria-hidden="true" />
+          </ion-button>
+        </ion-buttons>
         <ion-buttons slot="end">
           <ion-button class="tap-target logout-btn" aria-label="Sign out" @click="confirmLogout">
             <ion-icon :icon="logOutOutline" color="danger" aria-hidden="true" />
@@ -137,7 +142,7 @@ import {
 } from '@ionic/vue';
 import {
   homeOutline, settingsOutline, personCircleOutline, addOutline, trashBinOutline,
-  alertCircleOutline, calendarClearOutline, logOutOutline
+  alertCircleOutline, calendarClearOutline, logOutOutline, informationCircleOutline
 } from 'ionicons/icons';
 import dayjs from 'dayjs';
 import { api } from '@/composables/useApi';
@@ -326,6 +331,10 @@ async function fetchActivities() {
 
 function addActivity() {
   router.push({ name: 'AddActivity' });
+}
+
+function goToAbout() {
+  router.push({ name: 'About' });
 }
 
 /**

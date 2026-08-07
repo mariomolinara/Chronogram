@@ -2,6 +2,11 @@
   <ion-page>
     <ion-header translucent>
       <ion-toolbar color="dark">
+        <ion-buttons slot="start">
+          <ion-button class="tap-target" aria-label="About Chronogram" @click="goToAbout">
+            <ion-icon :icon="informationCircleOutline" />
+          </ion-button>
+        </ion-buttons>
         <ion-title class="ion-text-center title-peach">Administration</ion-title>
         <ion-buttons slot="end">
           <ion-button class="tap-target" aria-label="Sign out" @click="confirmLogout">
@@ -213,8 +218,8 @@ import {
   IonButtons, IonSpinner, alertController, onIonViewWillEnter, toastController
 } from '@ionic/vue';
 import {
-  alertCircleOutline, downloadOutline, exitOutline, hourglassOutline, keyOutline,
-  peopleOutline
+  alertCircleOutline, downloadOutline, exitOutline, hourglassOutline,
+  informationCircleOutline, keyOutline, peopleOutline
 } from 'ionicons/icons';
 import { api } from '@/composables/useApi';
 import { useAuthStore } from '@/store/auth';
@@ -347,6 +352,7 @@ async function loadPendingCount() {
 }
 
 const goToUsers = () => router.push({ name: 'AdminUsers' });
+const goToAbout = () => router.push({ name: 'About' });
 
 /**
  * Scarica un CSV. La richiesta passa dall'istanza axios autenticata, quindi non

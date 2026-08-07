@@ -1,6 +1,17 @@
 <template>
   <ion-page>
     <ion-content class="ion-padding ion-text-center">
+      <!-- About in alto a sinistra, come in Home e Administration; la rotta è
+           pubblica, quindi è raggiungibile anche senza account. -->
+      <ion-button
+          fill="clear"
+          class="about-button tap-target"
+          aria-label="About Chronogram"
+          @click="goToAbout"
+      >
+        <ion-icon slot="icon-only" :icon="informationCircleOutline" aria-hidden="true" />
+      </ion-button>
+
       <div class="login-container">
         <div class="logo-wrapper">
           <img src="/logo.png" alt="App Logo" class="login-logo" />
@@ -74,15 +85,6 @@
               </ion-col>
             </ion-row>
           </ion-grid>
-
-          <!-- Raggiungibile anche senza account: la rotta About è pubblica. -->
-          <ion-button
-              fill="clear"
-              class="about-link"
-              @click="goToAbout"
-          >
-            About Chronogram
-          </ion-button>
         </div>
       </div>
 
@@ -100,7 +102,9 @@ import {
   IonPage, IonContent, IonList, IonItem, IonInput, IonIcon,
   IonButton, IonGrid, IonRow, IonCol, IonSpinner // MODIFIED: Imported IonSpinner
 } from '@ionic/vue';
-import { alertCircleOutline, personOutline, keyOutline } from 'ionicons/icons';
+import {
+  alertCircleOutline, personOutline, keyOutline, informationCircleOutline
+} from 'ionicons/icons';
 import { apiErrorMessage } from '@/composables/useApi';
 import {
   collectErrors, errorSummary, isBlank, requiredMessage, useFormValidation
@@ -254,11 +258,14 @@ const goToAbout = () => {
   --padding-end: 0;
   height: auto;
 }
-.about-link {
+.about-button {
+  position: absolute;
+  top: calc(var(--space-2) + env(safe-area-inset-top));
+  left: var(--space-2);
+  z-index: 10;
   --color: var(--subtext0);
-  font-size: 0.8rem;
-  text-transform: none;
-  font-weight: 500;
-  margin-top: var(--space-4);
+}
+.about-button ion-icon {
+  font-size: 26px;
 }
 </style>
