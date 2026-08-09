@@ -17,6 +17,13 @@ public record RegisterRequest(
         @Size(min = 8, message = "Password must be at least 8 characters long") String password,
         String birthday,
         String gender,
-        String address
+        String address,
+        /**
+         * reCAPTCHA v3 token minted by the front-end for the "register" action.
+         * Optional here so environments without reCAPTCHA keep working; when the
+         * server has a secret configured, {@code RecaptchaService} rejects a
+         * missing or invalid token.
+         */
+        String recaptchaToken
 ) {
 }

@@ -18,6 +18,9 @@ public interface UserAuthRepository extends JpaRepository<UserAuth, Integer> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    /** Account linked to a Google identity (the {@code sub} claim of the ID token). */
+    Optional<UserAuth> findByGoogleSubject(String googleSubject);
+
     /**
      * The built-in administrator provisioned from configuration. At most one row
      * carries the system flag; {@code findFirst} keeps the query total even if a

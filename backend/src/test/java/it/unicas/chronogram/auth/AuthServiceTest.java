@@ -44,6 +44,10 @@ class AuthServiceTest {
     @Mock private LoginEventRepository loginEventRepository;
     @Mock private JwtService jwtService;
     @Mock private EmailService emailService;
+    @Mock private GoogleTokenVerifier googleTokenVerifier;
+
+    /** No secret configured in these tests, so the mock is a transparent no-op. */
+    @Mock(lenient = true) private RecaptchaService recaptchaService;
 
     @Mock(lenient = true) // password encoder is not touched in every path
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
@@ -60,14 +64,15 @@ class AuthServiceTest {
     void setUp() {
         ChronogramProperties properties = new ChronogramProperties();
         authService = new AuthService(userAuthRepository, userProfileRepository, loginEventRepository,
-                passwordEncoder, jwtService, new RegistrationPolicy(properties), emailService, properties);
+                passwordEncoder, jwtService, new RegistrationPolicy(properties), emailService, properties,
+                recaptchaService, googleTokenVerifier);
     }
 
     private RegisterRequest registerRequest() {
         return new RegisterRequest(
                 "Ada", "Lovelace", "123456",
                 "ada@example.com", "password123",
-                "10-12-1815", "F", "London");
+                "10-12-1815", "F", "London", null);
     }
 
     // ---- register ----
@@ -103,7 +108,7 @@ class AuthServiceTest {
     @Test
     void registerAutoApprovesATrustedDomainAndSendsNoPendingEmail() {
         RegisterRequest req = new RegisterRequest(
-                "Ada", "Lovelace", null, "ada@unicas.it", "password123", null, null, null);
+                "Ada", "Lovelace", null, "ada@unicas.it", "password123", null, null, null, null);
         when(userAuthRepository.existsByEmailIgnoreCase(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         UserAuth saved = new UserAuth();
@@ -124,7 +129,7 @@ class AuthServiceTest {
     @Test
     void registerOnASubdomainOfATrustedDomainIsAlsoAutoApproved() {
         RegisterRequest req = new RegisterRequest(
-                "Ada", "Lovelace", null, "ada@studenti.unicas.it", "password123", null, null, null);
+                "Ada", "Lovelace", null, "ada@studenti.unicas.it", "password123", null, null, null, null);
         when(userAuthRepository.existsByEmailIgnoreCase(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         UserAuth saved = new UserAuth();
@@ -183,7 +188,7 @@ class AuthServiceTest {
     void registerStoresNullBirthdayWhenFormatInvalid() {
         RegisterRequest req = new RegisterRequest(
                 "Ada", "Lovelace", null, "ada@example.com", "password123",
-                "not-a-date", null, null);
+                "not-a-date", null, null, null);
         when(userAuthRepository.existsByEmailIgnoreCase(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         UserAuth saved = new UserAuth();
@@ -334,6 +339,111 @@ class AuthServiceTest {
         assertThat(user.getLockedUntil()).isNotNull();
         assertThat(user.getLockedUntil()).isAfter(LocalDateTime.now());
         verify(jwtService, never()).generateToken(anyString(), any());
+    }
+
+    // ---- Google sign-in ----
+
+    private GoogleTokenVerifier.GoogleIdentity identity(String email) {
+        return new GoogleTokenVerifier.GoogleIdentity("google-sub-1", email, "Ada", "Lovelace");
+    }
+
+    @Test
+    void googleAuthCreatesAnAccountAndSignsInOnATrustedDomain() {
+        when(googleTokenVerifier.verify("tok")).thenReturn(identity("ada@unicas.it"));
+        when(userAuthRepository.findByGoogleSubject("google-sub-1")).thenReturn(Optional.empty());
+        when(userAuthRepository.findByEmailIgnoreCase("ada@unicas.it")).thenReturn(Optional.empty());
+        UserAuth saved = new UserAuth();
+        saved.setUserId(9);
+        saved.setEmail("ada@unicas.it");
+        saved.setStatus(AccountStatus.ACTIVE);
+        when(userAuthRepository.save(any(UserAuth.class))).thenReturn(saved);
+        when(jwtService.generateToken("ada@unicas.it", Role.USER)).thenReturn("jwt-token");
+
+        LoginResponse response = authService.googleAuth("tok");
+
+        assertThat(response.success()).isTrue();
+        assertThat(response.token()).isEqualTo("jwt-token");
+        ArgumentCaptor<UserAuth> captor = ArgumentCaptor.forClass(UserAuth.class);
+        // Two saves: account creation, then the last-login stamp of openSession.
+        verify(userAuthRepository, times(2)).save(captor.capture());
+        UserAuth created = captor.getAllValues().get(0);
+        assertThat(created.getPasswordHash()).isNull();
+        assertThat(created.getGoogleSubject()).isEqualTo("google-sub-1");
+        assertThat(created.getAuthProvider()).isEqualTo(it.unicas.chronogram.domain.AuthProvider.GOOGLE);
+        verify(userProfileRepository).save(any(UserProfile.class));
+        verify(loginEventRepository).save(any());
+    }
+
+    @Test
+    void googleAuthOnAnUntrustedDomainCreatesAPendingAccountAndRefusesTheSession() {
+        when(googleTokenVerifier.verify("tok")).thenReturn(identity("ada@gmail.com"));
+        when(userAuthRepository.findByGoogleSubject("google-sub-1")).thenReturn(Optional.empty());
+        when(userAuthRepository.findByEmailIgnoreCase("ada@gmail.com")).thenReturn(Optional.empty());
+        UserAuth saved = new UserAuth();
+        saved.setUserId(9);
+        saved.setEmail("ada@gmail.com");
+        saved.setStatus(AccountStatus.PENDING);
+        when(userAuthRepository.save(any(UserAuth.class))).thenReturn(saved);
+
+        LoginResponse response = authService.googleAuth("tok");
+
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).contains("waiting for administrator approval");
+        assertThat(response.token()).isNull();
+        verify(emailService).sendRegistrationPendingEmail("ada@gmail.com");
+        verify(jwtService, never()).generateToken(anyString(), any());
+        verify(loginEventRepository, never()).save(any());
+    }
+
+    @Test
+    void googleAuthLinksAnExistingLocalAccountByEmail() {
+        when(googleTokenVerifier.verify("tok")).thenReturn(identity("ada@example.com"));
+        when(userAuthRepository.findByGoogleSubject("google-sub-1")).thenReturn(Optional.empty());
+        UserAuth existing = activeUser();
+        when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(existing));
+        when(userAuthRepository.save(any(UserAuth.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateToken("ada@example.com", Role.USER)).thenReturn("jwt-token");
+
+        LoginResponse response = authService.googleAuth("tok");
+
+        assertThat(response.success()).isTrue();
+        assertThat(existing.getGoogleSubject()).isEqualTo("google-sub-1");
+        // The local account keeps its password: Google becomes a second door,
+        // not a replacement.
+        assertThat(existing.getPasswordHash()).isEqualTo("stored-hash");
+        verify(userProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void googleAuthSignsInAnAccountAlreadyLinkedBySubject() {
+        when(googleTokenVerifier.verify("tok")).thenReturn(identity("ada@example.com"));
+        UserAuth existing = activeUser();
+        existing.setGoogleSubject("google-sub-1");
+        when(userAuthRepository.findByGoogleSubject("google-sub-1")).thenReturn(Optional.of(existing));
+        when(userAuthRepository.save(any(UserAuth.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateToken("ada@example.com", Role.USER)).thenReturn("jwt-token");
+
+        LoginResponse response = authService.googleAuth("tok");
+
+        assertThat(response.success()).isTrue();
+        assertThat(response.token()).isEqualTo("jwt-token");
+        verify(userAuthRepository, never()).findByEmailIgnoreCase(anyString());
+        verify(loginEventRepository).save(any());
+    }
+
+    @Test
+    void loginWithAPasswordOnAGoogleOnlyAccountSaysInvalidCredentials() {
+        UserAuth user = activeUser();
+        user.setPasswordHash(null); // created via Google, no local password
+        when(userAuthRepository.findByEmailIgnoreCase("ada@example.com")).thenReturn(Optional.of(user));
+
+        LoginResponse response = authService.login("ada@example.com", "whatever");
+
+        // Indistinguishable from a wrong password: "use Google instead" would
+        // confirm the account exists to an anonymous caller.
+        assertThat(response.success()).isFalse();
+        assertThat(response.message()).isEqualTo("Invalid credentials.");
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
     }
 
     @Test

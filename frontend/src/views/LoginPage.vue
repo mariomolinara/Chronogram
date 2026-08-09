@@ -85,6 +85,11 @@
               </ion-col>
             </ion-row>
           </ion-grid>
+
+          <!-- Alternativa a email+password: compare solo se il client ID è
+               configurato (vedi GoogleSignInButton). Il backend crea l'account
+               alla prima entrata, quindi vale sia come login sia come sign-up. -->
+          <GoogleSignInButton @credential="handleGoogleCredential" @error="handleGoogleError" />
         </div>
       </div>
 
@@ -110,6 +115,7 @@ import {
   collectErrors, errorSummary, isBlank, requiredMessage, useFormValidation
 } from '@/composables/useValidation';
 import FieldError from '@/components/FieldError.vue';
+import GoogleSignInButton from '@/components/GoogleSignInButton.vue';
 
 /** Oltre questa lunghezza il messaggio non si legge in un toast breve. */
 const LONG_MESSAGE_LENGTH = 45;
@@ -180,6 +186,38 @@ const handleLogin = async () => {
     isLoading.value = false;
   }
 };
+/**
+ * L'ID token è già stato emesso da Google: qui resta solo la verifica del
+ * backend e l'apertura della sessione. Gli esiti negativi (account in attesa
+ * di approvazione, bloccato) seguono la stessa strada del login classico:
+ * notice persistente + toast.
+ */
+const handleGoogleCredential = async (idToken: string) => {
+  isLoading.value = true;
+  notice.value = null;
+  try {
+    await auth.loginWithGoogle(idToken);
+    presentToast('Login successful!', 'success');
+    const target = safeRedirectTarget(route.query.redirect);
+    router.push(target ?? { name: auth.isAdmin ? 'AdminDashboard' : 'Home' });
+  } catch (error) {
+    const errorMessage = apiErrorMessage(error, 'Google sign-in failed.');
+    notice.value = errorMessage;
+    presentToast(
+        errorMessage,
+        'danger',
+        errorMessage.length > LONG_MESSAGE_LENGTH ? LONG_TOAST_DURATION : undefined
+    );
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const handleGoogleError = (message: string) => {
+  notice.value = message;
+  presentToast(message, 'danger');
+};
+
 const goToRegistration = () => {
   router.push({ name: 'Register' });
 };

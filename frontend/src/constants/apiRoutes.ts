@@ -11,6 +11,7 @@
 export const PUBLIC_API_PATHS = [
   '/api/auth/login',
   '/api/auth/register',
+  '/api/auth/google',
   '/api/auth/request-reset',
   '/api/auth/reset-password',
 ] as const;

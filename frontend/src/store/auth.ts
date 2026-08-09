@@ -130,8 +130,23 @@ export const useAuthStore = defineStore('auth', () => {
 
     async function login(credentials: { email: string; password: string }): Promise<LoginResponse> {
         const response = await api.post<LoginResponse>('/api/auth/login', credentials);
-        const data = response.data;
+        return applyLoginResponse(response.data);
+    }
 
+    /**
+     * Accesso con Google: l'ID token prodotto dal client (GIS sul web,
+     * Credential Manager su Android) viene verificato dal backend, che alla
+     * prima occasione crea anche l'account. La risposta ha lo stesso contratto
+     * del login: un rifiuto di business (account in attesa/bloccato) arriva
+     * come `success=false` con la spiegazione nel `message`.
+     */
+    async function loginWithGoogle(idToken: string): Promise<LoginResponse> {
+        const response = await api.post<LoginResponse>('/api/auth/google', { idToken });
+        return applyLoginResponse(response.data);
+    }
+
+    /** Apertura sessione comune a ogni forma di autenticazione riuscita. */
+    async function applyLoginResponse(data: LoginResponse): Promise<LoginResponse> {
         if (!data.success || !data.token) {
             throw new Error(data.message || 'Login failed');
         }
@@ -254,6 +269,7 @@ export const useAuthStore = defineStore('auth', () => {
         mustChangePassword,
         getToken,
         login,
+        loginWithGoogle,
         logout,
         checkAuthStatus,
         clearMustChangePassword

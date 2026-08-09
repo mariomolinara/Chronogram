@@ -20,6 +20,7 @@
     "@capacitor/keyboard": "8.0.5",
     "@capacitor/preferences": "8.0.1",
     "@capacitor/status-bar": "8.0.3",
+    "@capgo/capacitor-social-login": "^8.3.40",
     "@ionic/vue": "^8.0.0",
     "@ionic/vue-router": "^8.0.0",
     "axios": "^1.9.0",

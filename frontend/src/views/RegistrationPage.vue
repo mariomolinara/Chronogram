@@ -129,6 +129,22 @@
             </ion-item>
             <FieldError :message="errorFor('password')" />
 
+            <!-- Conferma: stesso pattern di ResetPasswordPage. Niente occhio:
+                 per verificare basta rivelare il primo campo e confrontare. -->
+            <ion-item :class="fieldClass('confirmPassword')" class="glass-input" data-field="confirmPassword">
+              <ion-icon slot="start" :icon="keyOutline" class="input-icon" />
+              <ion-input
+                  v-model="form.confirmPassword"
+                  type="password"
+                  label-placement="floating"
+                  autocomplete="new-password"
+                  :aria-invalid="!!errorFor('confirmPassword')"
+              >
+                <div slot="label">Confirm password <RequiredMark /></div>
+              </ion-input>
+            </ion-item>
+            <FieldError :message="errorFor('confirmPassword')" />
+
             <ion-item
                 class="glass-input"
                 :class="{ 'item-has-value': !!form.birthday }"
@@ -180,6 +196,25 @@
               </ion-col>
             </ion-row>
           </ion-grid>
+
+          <!-- Alternativa alla registrazione col form: il backend crea l'account
+               dai dati verificati da Google (nome, cognome, email) alla prima
+               entrata. Gli esiti negativi (es. account in attesa di
+               approvazione) restano scritti nel notice qui sotto. -->
+          <GoogleSignInButton @credential="handleGoogleCredential" @error="handleGoogleError" />
+
+          <div v-if="googleNotice" class="google-notice" role="alert">
+            <ion-icon :icon="alertCircleOutline" aria-hidden="true" />
+            <p>{{ googleNotice }}</p>
+          </div>
+
+          <!-- Attribuzione richiesta da Google quando il badge fisso di
+               reCAPTCHA è nascosto (vedi lo stile globale in fondo al file). -->
+          <p v-if="recaptchaEnabled" class="recaptcha-attribution">
+            This site is protected by reCAPTCHA and the Google
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> and
+            <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Terms of Service</a> apply.
+          </p>
         </div>
       </div>
 
@@ -239,15 +274,18 @@ import {
   IonButton, IonGrid, IonRow, IonCol, IonSelect, IonSelectOption,
   IonLabel, IonDatetime, IonModal, IonLoading
 } from '@ionic/vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   personAddOutline, eyeOutline, eyeOffOutline,
   callOutline, mailOutline, mailUnreadOutline, personOutline,
   keyOutline, calendarOutline, transgenderOutline,
-  locationOutline
+  locationOutline, alertCircleOutline
 } from 'ionicons/icons';
 import dayjs from 'dayjs';
 import { api, apiErrorMessage } from '@/composables/useApi';
+import { useAuthStore } from '@/store/auth';
+import { safeRedirectTarget } from '@/router';
+import { getRecaptchaToken, isRecaptchaEnabled } from '@/composables/useRecaptcha';
 import { useToast } from '@/composables/useToast';
 import {
   collectErrors, errorSummary, isBlank, isStrongPassword, isValidEmail,
@@ -257,6 +295,7 @@ import {
 import RequiredMark from '@/components/RequiredMark.vue';
 import FieldError from '@/components/FieldError.vue';
 import FormLegend from '@/components/FormLegend.vue';
+import GoogleSignInButton from '@/components/GoogleSignInButton.vue';
 
 /**
  * Esito della registrazione restituito dal backend in `data`: `ACTIVE` quando
@@ -280,14 +319,19 @@ const DEFAULT_BIRTHDAY = '2000-01-01';
 
 /* ---------- state ---------- */
 const router         = useRouter();
+const route          = useRoute();
+const auth           = useAuthStore();
 const isBirthdayOpen = ref(false);
 const isLoading      = ref(false);
 const showPassword   = ref(false);
 const dateIso        = ref<string>(DEFAULT_BIRTHDAY);
+const recaptchaEnabled = isRecaptchaEnabled();
+/** Esito negativo dell'accesso Google, persistente finché non si ritenta. */
+const googleNotice   = ref<string | null>(null);
 
 const form = reactive({
   name: '', surname: '', address: '', phone: '',
-  email: '', password: '', birthday: '', gender: ''
+  email: '', password: '', confirmPassword: '', birthday: '', gender: ''
 });
 
 const { showToast } = useToast();
@@ -299,7 +343,7 @@ const birthdayAriaLabel = computed(() =>
 );
 /* ---------- validazione ---------- */
 /** Campi obbligatori, nell'ordine in cui compaiono nella form. */
-const REQUIRED_ORDER = ['name', 'surname', 'address', 'email', 'password'] as const;
+const REQUIRED_ORDER = ['name', 'surname', 'address', 'email', 'password', 'confirmPassword'] as const;
 type RequiredField = (typeof REQUIRED_ORDER)[number];
 
 const { errors, errorFor, fieldClass, validateOnSubmit } =
@@ -310,7 +354,12 @@ const { errors, errorFor, fieldClass, validateOnSubmit } =
       { field: 'email', invalid: isBlank(form.email), message: requiredMessage('Email') },
       { field: 'email', invalid: !isValidEmail(form.email), message: EMAIL_ERROR },
       { field: 'password', invalid: isBlank(form.password), message: requiredMessage('Password') },
-      { field: 'password', invalid: !isStrongPassword(form.password), message: PASSWORD_ERROR }
+      { field: 'password', invalid: !isStrongPassword(form.password), message: PASSWORD_ERROR },
+      { field: 'confirmPassword', invalid: isBlank(form.confirmPassword),
+        message: 'Repeat the password to confirm it' },
+      { field: 'confirmPassword',
+        invalid: !isBlank(form.confirmPassword) && form.password !== form.confirmPassword,
+        message: 'The two passwords do not match' }
     ]), REQUIRED_ORDER);
 
 const openBirthdayModal = () => {
@@ -352,7 +401,16 @@ async function handleRegister() {
 
   isLoading.value = true;
   try {
-    const { data } = await api.post<RegisterResponse>('/api/auth/register', { ...form });
+    // Payload esplicito: `confirmPassword` è un controllo solo locale e non
+    // deve viaggiare. Il token reCAPTCHA (null se non configurato) si chiede
+    // al momento del submit: vale pochi minuti e per una sola verifica.
+    const payload = {
+      name: form.name, surname: form.surname, address: form.address,
+      phone: form.phone, email: form.email, password: form.password,
+      birthday: form.birthday, gender: form.gender,
+      recaptchaToken: await getRecaptchaToken('register')
+    };
+    const { data } = await api.post<RegisterResponse>('/api/auth/register', payload);
     if (!data?.success) throw new Error(data?.message ?? 'Unknown error');
 
     // Il backend distingue i due esiti in `data`: un account PENDING non può
@@ -374,6 +432,37 @@ async function handleRegister() {
     isLoading.value = false;
   }
 }
+
+/* ---------- registrazione/accesso con Google ---------- */
+
+/**
+ * Il backend verifica l'ID token e, se è la prima volta, crea l'account con i
+ * dati garantiti da Google: in caso di successo la sessione è già aperta e si
+ * entra direttamente. Un account fuori dominio auto-approvato nasce PENDING:
+ * il rifiuto arriva con la spiegazione nel message e resta scritto nel notice.
+ */
+const handleGoogleCredential = async (idToken: string) => {
+  isLoading.value = true;
+  googleNotice.value = null;
+  try {
+    await auth.loginWithGoogle(idToken);
+    showToast('Signed in with Google!', 'success');
+    isLoading.value = false;
+    const target = safeRedirectTarget(route.query.redirect);
+    await router.push(target ?? { name: auth.isAdmin ? 'AdminDashboard' : 'Home' });
+  } catch (err: unknown) {
+    const message = apiErrorMessage(err, 'Google sign-in failed.');
+    googleNotice.value = message;
+    showToast(message, 'danger');
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const handleGoogleError = (message: string) => {
+  googleNotice.value = message;
+  showToast(message, 'danger');
+};
 
 </script>
 
@@ -469,5 +558,48 @@ ion-modal.birthday-modal {
 }
 ion-modal.birthday-modal ion-datetime {
   height: auto;
+}
+.google-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface0);
+  border: 1px solid var(--peach);
+  text-align: start;
+}
+.google-notice ion-icon {
+  color: var(--peach);
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.google-notice p {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--subtext1);
+  line-height: 1.5;
+}
+.recaptcha-attribution {
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-xs, 0.75rem);
+  color: var(--subtext0);
+  line-height: 1.5;
+  text-align: center;
+}
+.recaptcha-attribution a {
+  color: var(--subtext0);
+  text-decoration: underline;
+}
+</style>
+
+<style>
+/* Il badge fisso di reCAPTCHA v3 (angolo in basso a destra) coprirebbe i
+   bottoni su mobile: Google consente di nasconderlo purché l'attribuzione
+   compaia nel flusso, ed è il paragrafo .recaptcha-attribution qui sopra.
+   Regola non scoped: il badge è appeso a <body>, fuori dal componente. */
+.grecaptcha-badge {
+  visibility: hidden;
 }
 </style>

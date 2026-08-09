@@ -42,6 +42,17 @@ public class AuthController {
         return authService.login(request.email(), request.password());
     }
 
+    /**
+     * Sign-in with a Google ID token; on first use it also creates the account.
+     * Same contract as {@code /login}: business refusals (account pending or
+     * blocked) come back 200 with {@code success=false} and an explanation,
+     * while an invalid token is a 401 from {@code GoogleTokenVerifier}.
+     */
+    @PostMapping("/google")
+    public LoginResponse google(@Valid @RequestBody GoogleAuthRequest request) {
+        return authService.googleAuth(request.idToken());
+    }
+
     @PostMapping("/request-reset")
     public ApiResponse<Void> requestReset(@Valid @RequestBody ForgotPasswordRequest request) {
         // The reset link is built server-side from the configured canonical URL,

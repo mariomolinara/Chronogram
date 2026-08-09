@@ -7,11 +7,12 @@
  * autenticarsi.
  */
 
-const FORM = ['Giulia', 'Esposito', 'Via Roma 1', '3331112222', 'giulia@gmail.com', 'Password1!']
+// Ordine dei campi nella pagina; l'ultimo è la conferma della password.
+const FORM = ['Giulia', 'Esposito', 'Via Roma 1', '3331112222', 'giulia@gmail.com', 'Password1!', 'Password1!']
 
 function fillRegistrationForm(): void {
   cy.visit('/register')
-  cy.get('ion-input').should('have.length.at.least', 6)
+  cy.get('ion-input').should('have.length.at.least', 7)
   FORM.forEach((value, index) => {
     cy.get('ion-input').eq(index).find('input').type(value)
   })

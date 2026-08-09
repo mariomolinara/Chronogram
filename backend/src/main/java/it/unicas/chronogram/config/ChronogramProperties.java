@@ -36,6 +36,12 @@ public class ChronogramProperties {
     @NestedConfigurationProperty
     private Support support = new Support();
 
+    @NestedConfigurationProperty
+    private Google google = new Google();
+
+    @NestedConfigurationProperty
+    private Recaptcha recaptcha = new Recaptcha();
+
     @Getter
     @Setter
     public static class Security {
@@ -138,6 +144,45 @@ public class ChronogramProperties {
          * message on the floor.
          */
         private String email;
+    }
+
+    /** "Sign in with Google" (OpenID Connect). */
+    @Getter
+    @Setter
+    public static class Google {
+        /**
+         * OAuth client IDs whose ID tokens are accepted (the {@code aud} claim
+         * must match one of them). Normally just the <em>web</em> client ID:
+         * the Android app also asks Google for a token addressed to the web
+         * client, so one entry covers both platforms. Empty list = the Google
+         * endpoint answers "not configured" and the web/app hide the button.
+         */
+        private List<String> clientIds = List.of();
+
+        public boolean isConfigured() {
+            return clientIds != null && !clientIds.isEmpty();
+        }
+    }
+
+    /**
+     * Server-side verification of Google reCAPTCHA v3 tokens on registration.
+     * Disabled (no-op) while the secret is blank, so local development and the
+     * test-suite need no Google account.
+     */
+    @Getter
+    @Setter
+    public static class Recaptcha {
+        /** Secret key of the reCAPTCHA v3 site. Blank disables verification. */
+        private String secret;
+        /**
+         * Minimum score accepted (v3 returns 0.0 = bot ... 1.0 = human).
+         * Google's suggested default is 0.5.
+         */
+        private double minScore = 0.5;
+
+        public boolean isEnabled() {
+            return secret != null && !secret.isBlank();
+        }
     }
 
     /** Windows behind the admin dashboard metrics. */

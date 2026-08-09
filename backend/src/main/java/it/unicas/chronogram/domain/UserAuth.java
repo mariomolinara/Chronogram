@@ -27,8 +27,26 @@ public class UserAuth {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    /**
+     * BCrypt hash of the local password. Null for accounts created via Google
+     * sign-in that never set one: such accounts authenticate with an ID token
+     * and can gain a local password only through the password-reset flow.
+     */
+    @Column(name = "password_hash")
     private String passwordHash;
+
+    /** How the account came into existence. Never changes after creation. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_provider", nullable = false, length = 20)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    /**
+     * Google's stable identifier for the user (the {@code sub} claim of the ID
+     * token). Set the first time the user signs in with Google, whether the
+     * account was created by that sign-in or already existed as a local one.
+     */
+    @Column(name = "google_subject", unique = true)
+    private String googleSubject;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

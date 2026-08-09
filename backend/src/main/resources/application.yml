@@ -94,6 +94,18 @@ chronogram:
     # falling back to ADMIN_EMAIL. With none of the three set the endpoint
     # answers 503 rather than silently discarding a user's message.
     email: ${SUPPORT_EMAIL:}
+  google:
+    # OAuth client IDs whose Google ID tokens are accepted (aud claim). Normally
+    # just the WEB client ID: the Android app requests tokens addressed to the
+    # same web client. Comma-separated; empty disables "Sign in with Google".
+    client-ids: ${GOOGLE_CLIENT_IDS:}
+  recaptcha:
+    # reCAPTCHA v3 secret key, verified server-side on registration. Empty
+    # disables the check (local development, tests). The matching SITE key goes
+    # in the front-end env (VITE_RECAPTCHA_SITE_KEY).
+    secret: ${RECAPTCHA_SECRET_KEY:}
+    # Minimum v3 score accepted (0.0 = bot ... 1.0 = human).
+    min-score: ${RECAPTCHA_MIN_SCORE:0.5}
   stats:
     # Windows behind the dashboard metrics (see AdminService).
     active-window-days: ${STATS_ACTIVE_WINDOW_DAYS:10}
