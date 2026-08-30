@@ -37,16 +37,20 @@
         </div>
 
         <p>
-          Time is the one resource we all share in equal measure, yet how we
-          allocate it across work, care, leisure and rest remains largely
-          invisible — even to ourselves. Chronogram was conceived as a
-          research tool to make that allocation visible: by recording daily
-          activities, in real time or retrospectively, participants build
-          the empirical ground on which the study of time use stands.
+          Time is the one resource we all share in equal measure,
+          yet how we navigate it across our daily activities to live
+          better lives remains largely invisible — even to ourselves.
+          Chronogram was conceived as a research tool to make our
+          choices regarding time and monetary budget allocation transparent.
+          By recording daily activities and expenses, whether in
+          real time or retrospectively, participants build the
+          empirical foundation for understanding the enjoyment
+          of time use. This collective effort can also provide
+          policymakers with invaluable insights to design policies
+          that better support societal well-being.
         </p>
         <p>
-          I am grateful to everyone who contributes their time — in both
-          senses — to this project.
+          I am grateful to everyone who contributes their time — in both senses — to this project.
         </p>
         <p class="signature">
           Prof. Sergio Nisticò<br />
