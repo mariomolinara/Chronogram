@@ -34,7 +34,7 @@ public class RegistrationPolicy {
     /**
      * Whether the address belongs to a trusted domain. Matching is
      * case-insensitive and includes sub-domains, so {@code unicas.it} also
-     * admits {@code mario@studenti.unicas.it} but never {@code notunicas.it}.
+     * admits {@code mario@studentmail.unicas.it} but never {@code notunicas.it}.
      */
     public boolean isAutoApproved(String email) {
         String domain = domainOf(email);

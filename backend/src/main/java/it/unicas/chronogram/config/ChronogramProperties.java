@@ -119,7 +119,7 @@ public class ChronogramProperties {
          * Email domains whose registrations are approved automatically. Everyone
          * else is created PENDING and needs an administrator to approve them.
          * Matching is case-insensitive and covers sub-domains, so {@code unicas.it}
-         * also admits {@code studenti.unicas.it}. An empty list sends every new
+         * also admits {@code studentmail.unicas.it}. An empty list sends every new
          * registration through manual approval.
          */
         private List<String> autoApproveDomains = List.of("unicas.it");

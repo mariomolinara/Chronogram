@@ -36,9 +36,20 @@ class RegistrationPolicyTest {
         assertThat(policy.isAutoApproved("Mario@Unicas.IT")).isTrue();
     }
 
+    /**
+     * The two institutional domains actually in use: staff on {@code unicas.it},
+     * students on {@code studentmail.unicas.it}. Both must skip human review, and
+     * both get there through the sub-domain rule — the allowlist names only
+     * {@code unicas.it}. Pinned explicitly so that narrowing the rule to an exact
+     * match fails here instead of silently sending every student registration to
+     * the approval queue.
+     */
     @Test
     void subDomainsOfATrustedDomainAreTrustedToo() {
-        assertThat(defaultPolicy().isAutoApproved("mario@studenti.unicas.it")).isTrue();
+        RegistrationPolicy policy = defaultPolicy();
+
+        assertThat(policy.statusFor("mario@studentmail.unicas.it")).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(policy.isAutoApproved("mario@studenti.unicas.it")).isTrue();
     }
 
     /**

@@ -208,8 +208,8 @@ Accounts have a lifecycle state (`user_auth.account_status`, added in `V4`):
 Registrations from a domain in `REGISTRATION_AUTO_APPROVE_DOMAINS` become `ACTIVE`
 immediately; every other address becomes `PENDING`, and both the applicant and the
 administrator are emailed. Matching is case-insensitive and covers sub-domains
-(`unicas.it` also admits `studenti.unicas.it`), but never look-alikes such as
-`notunicas.it`.
+(`unicas.it` also admits `studentmail.unicas.it`, the student domain), but never
+look-alikes such as `notunicas.it`.
 
 At login the state is only revealed **after** the password has been verified —
 otherwise the form would tell anyone which addresses are registered. A correct
