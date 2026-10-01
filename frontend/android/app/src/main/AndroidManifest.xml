@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -39,4 +40,31 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        Promemoria periodici (@capacitor/local-notifications).
+
+        Il manifest del plugin dichiara quattro permessi; tre li vogliamo e
+        arrivano per merge, senza bisogno di ripeterli qui:
+          - POST_NOTIFICATIONS      mostrare le notifiche su Android 13+
+          - RECEIVE_BOOT_COMPLETED  ri-schedulare i promemoria dopo un reboot
+          - WAKE_LOCK               svegliare il device all'orario previsto
+
+        SCHEDULE_EXACT_ALARM invece va RIMOSSO dal merge:
+        `useLocalReminders.ts` schedula sempre con `isExactNotification: false`,
+        quindi il plugin usa gli allarmi INESATTI (`AlarmManager.set*`, non
+        `setExactAndAllowWhileIdle`) e il permesso non serve mai a runtime.
+        Lasciarlo dichiarato sarebbe però un permesso "sensibile" per Google
+        Play: richiederebbe una giustificazione in fase di review (la policy
+        sugli exact alarm ammette solo sveglie/timer/calendari) e i promemoria
+        a cadenza configurabile di Chronogram non rientrano in quei casi d'uso.
+        Meglio non chiederlo affatto: la review resta senza domande aperte.
+
+        Se in futuro servisse un promemoria all'istante esatto, va rimossa
+        questa riga, rimesso `isExactNotification: true` nel composable e
+        preparata la giustificazione per la Play Console.
+    -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        tools:node="remove" />
 </manifest>

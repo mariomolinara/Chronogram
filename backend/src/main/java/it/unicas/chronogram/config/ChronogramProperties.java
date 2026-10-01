@@ -42,6 +42,9 @@ public class ChronogramProperties {
     @NestedConfigurationProperty
     private Recaptcha recaptcha = new Recaptcha();
 
+    @NestedConfigurationProperty
+    private Push push = new Push();
+
     @Getter
     @Setter
     public static class Security {
@@ -182,6 +185,40 @@ public class ChronogramProperties {
 
         public boolean isEnabled() {
             return secret != null && !secret.isBlank();
+        }
+    }
+
+    /**
+     * Web Push (VAPID) delivery of the periodic "log your activities" reminders.
+     *
+     * <p>The key pair identifies this server to every browser push service; it is
+     * generated once per installation with {@code npx web-push
+     * generate-vapid-keys} and the public half is handed to the front-end, which
+     * pins it into the subscription it creates. Changing it invalidates every
+     * subscription already stored.
+     *
+     * <p>Both keys blank - the default - leaves the feature switched off without
+     * breaking anything: the endpoints still answer, reporting
+     * {@code configured: false}, so the front-end can hide the switch instead of
+     * failing on it.
+     */
+    @Getter
+    @Setter
+    public static class Push {
+        /** Public VAPID key (base64url, uncompressed P-256 point). Safe to expose. */
+        private String vapidPublicKey;
+        /** Private VAPID key (base64url). A secret: environment only, never logged. */
+        private String vapidPrivateKey;
+        /**
+         * The {@code sub} claim of the VAPID JWT: how a push service reaches
+         * whoever runs this installation if our requests misbehave. Must be a
+         * {@code mailto:} or {@code https:} URI.
+         */
+        private String subject = "mailto:chronogram@unicas.it";
+
+        public boolean isConfigured() {
+            return vapidPublicKey != null && !vapidPublicKey.isBlank()
+                    && vapidPrivateKey != null && !vapidPrivateKey.isBlank();
         }
     }
 

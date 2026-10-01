@@ -99,6 +99,20 @@ chronogram:
     # just the WEB client ID: the Android app requests tokens addressed to the
     # same web client. Comma-separated; empty disables "Sign in with Google".
     client-ids: ${GOOGLE_CLIENT_IDS:}
+  push:
+    # Web Push (VAPID) key pair for the periodic activity reminders. Generate one
+    # per installation with:  npx web-push generate-vapid-keys
+    # The PUBLIC key is also baked into the front-end; the PRIVATE key is a secret
+    # and belongs in the environment only. Changing the pair invalidates every
+    # subscription already stored (browsers pin the key they subscribed with).
+    # Both empty = the feature is off: the /api/notifications endpoints still work
+    # and report configured=false, so the client hides the switch instead of
+    # failing on it, and the scheduler does nothing.
+    vapid-public-key: ${VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${VAPID_PRIVATE_KEY:}
+    # Contact for whoever runs this installation, sent to the push services in the
+    # VAPID token. Must be a mailto: or https: URI.
+    subject: ${VAPID_SUBJECT:mailto:chronogram@unicas.it}
   recaptcha:
     # reCAPTCHA v3 secret key, verified server-side on registration. Empty
     # disables the check (local development, tests). The matching SITE key goes

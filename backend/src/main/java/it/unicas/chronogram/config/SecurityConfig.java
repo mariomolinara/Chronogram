@@ -75,6 +75,11 @@ public class SecurityConfig {
                         // so authentication is the only authorisation they need.
                         .requestMatchers("/api/profile/**").authenticated()
                         .requestMatchers("/api/support/**").authenticated()
+                        // Push-notification settings and the browser subscriptions
+                        // behind them: same rule as the two above. The public VAPID
+                        // key is handed out from here too, so that a client learns
+                        // it only after proving who it is.
+                        .requestMatchers("/api/notifications/**").authenticated()
                         // Back-office: aggregate stats and full-database export.
                         .requestMatchers("/api/admin/**").hasRole(Role.ADMIN.name())
                         // Catch-all for any future /api endpoint added without an

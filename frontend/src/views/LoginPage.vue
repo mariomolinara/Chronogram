@@ -111,6 +111,7 @@ import {
   alertCircleOutline, personOutline, keyOutline, informationCircleOutline
 } from 'ionicons/icons';
 import { apiErrorMessage } from '@/composables/useApi';
+import { syncLocalRemindersFromBackend } from '@/composables/usePushNotifications';
 import {
   collectErrors, errorSummary, isBlank, requiredMessage, useFormValidation
 } from '@/composables/useValidation';
@@ -163,6 +164,12 @@ const handleLogin = async () => {
     await auth.login({ email: email.value, password: password.value });
     presentToast('Login successful!', 'success');
 
+    // App nativa: la coda dei promemoria locali va riempita ora e non al
+    // prossimo avvio, altrimenti dopo una nuova installazione l'utente che ha
+    // i promemoria attivi non ne riceverebbe nessuno per tutta la sessione.
+    // Senza `await`: non deve ritardare la navigazione. No-op sul web.
+    void syncLocalRemindersFromBackend();
+
     // Se il guard ci ha mandati qui da una pagina privata, si riprende da
     // quella: chi apre un link diretto e deve autenticarsi non viene scaricato
     // sulla home. Il valore è filtrato (solo path interni) per non farne un
@@ -198,6 +205,7 @@ const handleGoogleCredential = async (idToken: string) => {
   try {
     await auth.loginWithGoogle(idToken);
     presentToast('Login successful!', 'success');
+    void syncLocalRemindersFromBackend();
     const target = safeRedirectTarget(route.query.redirect);
     router.push(target ?? { name: auth.isAdmin ? 'AdminDashboard' : 'Home' });
   } catch (error) {

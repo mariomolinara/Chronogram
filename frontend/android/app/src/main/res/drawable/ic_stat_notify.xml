@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Icona piccola (smallIcon) delle notifiche di Chronogram.
+
+    Da Android 5 il sistema ignora i colori della smallIcon e ne usa SOLO il
+    canale alpha come maschera, ricolorandola (bianca in barra di stato, tinta
+    con `iconColor` nel drawer). Perciò il glifo deve essere monocromatico
+    bianco su trasparente: una icona a colori come `ic_launcher` diventa una
+    silhouette piena, cioe' il classico quadrato bianco.
+
+    Glifo: un orologio (coerente col nome dell'app), ~20dp dentro il canvas
+    24x24dp richiesto per le notification icon, con un margine di sicurezza.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!--
+        Quadrante: anello ottenuto con fillType="evenOdd" (cerchio esterno
+        r=9.5 meno cerchio interno r=8), piu' prevedibile di uno stroke alle
+        dimensioni minime a cui questa icona viene rasterizzata.
+    -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,2.5a9.5,9.5 0 1,0 0,19a9.5,9.5 0 1,0 0,-19zM12,4a8,8 0 1,1 0,16a8,8 0 1,1 0,-16z" />
+
+    <!-- Lancette: ora verso l'alto, minuti verso destra (fill nonZero: si uniscono al centro). -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.25,6.75h1.5v6h-1.5zM12,11.25h4.25v1.5h-4.25z" />
+</vector>

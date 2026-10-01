@@ -24,6 +24,23 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: 'native' as any,
       resizeOnFullScreen: true
+    },
+    // LocalNotifications plugin (@capacitor/local-notifications) — promemoria
+    // periodici schedulati sul device da `useLocalReminders.ts`.
+    //
+    // `smallIcon` e obbligatorio in pratica: senza, il plugin ricade su
+    // `ic_launcher` e da Android 5 il sistema usa solo il canale alpha della
+    // smallIcon come maschera, quindi un'icona a colori diventa una silhouette
+    // piena — il famigerato quadrato bianco in barra di stato. Il valore e il
+    // nome della risorsa drawable senza estensione:
+    // android/app/src/main/res/drawable/ic_stat_notify.xml (glifo orologio
+    // bianco su trasparente).
+    //
+    // `iconColor` e la tinta applicata dal sistema all'icona e al nome app nel
+    // drawer: mauve Catppuccin Latte, lo stesso `--ion-color-primary` del tema.
+    LocalNotifications: {
+      smallIcon: 'ic_stat_notify',
+      iconColor: '#8839EF'
     }
     // NOTE: no SplashScreen config here because the @capacitor/splash-screen
     // plugin is NOT installed. The launch screen is handled natively by the

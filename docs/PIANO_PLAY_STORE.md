@@ -84,15 +84,40 @@ androidxWebkitVersion = '1.12.1'
 
 `frontend/android/app/src/main/AndroidManifest.xml`:
 
-- **Un solo permesso**: `android.permission.INTERNET`. Ottimo per la review.
+- **Permesso dichiarato a mano**: solo `android.permission.INTERNET`.
+- **Permessi ereditati dal merge** con `@capacitor/local-notifications`
+  (feature "notifiche periodiche"), tutti e tre necessari e tutti e tre
+  *install-time* o gestiti dal normale flusso di runtime:
+  | Permesso | Perché serve | Impatto review |
+  |---|---|---|
+  | `POST_NOTIFICATIONS` | mostrare i promemoria su Android 13+ | runtime permission standard, nessuna giustificazione |
+  | `RECEIVE_BOOT_COMPLETED` | ri-schedulare i promemoria dopo un reboot | normale |
+  | `WAKE_LOCK` | svegliare il device all'orario del promemoria | normale |
+- **Permesso rimosso dal merge**: `SCHEDULE_EXACT_ALARM`. Il plugin lo dichiara
+  nel suo manifest, ma `frontend/src/composables/useLocalReminders.ts` schedula
+  sempre con `isExactNotification: false` (allarmi **inesatti**), quindi non
+  serve. È neutralizzato nel manifest dell'app con
+  `tools:node="remove"` (e `xmlns:tools` sul tag `<manifest>`).
+  **Perché conta per la pubblicazione**: `SCHEDULE_EXACT_ALARM` è un permesso
+  sensibile e la policy Play ne ammette l'uso solo per sveglie, timer e
+  calendari/promemoria basati su eventi; dichiararlo per promemoria a cadenza
+  configurabile aprirebbe una richiesta di giustificazione in review (con
+  rischio di rigetto). Non chiederlo affatto è la strada pulita.
+  → Se in futuro servissero istanti esatti: togliere il `tools:node="remove"`,
+  rimettere `isExactNotification: true` e preparare la giustificazione in
+  Play Console.
 - `android:networkSecurityConfig="@xml/network_security_config"` presente:
   `base-config cleartextTrafficPermitted="false"` + eccezioni cleartext solo per
   host di sviluppo (`localhost`, `127.0.0.1`, `10.0.2.2`, `10.0.3.2`,
   `192.168.1.100`). Configurazione corretta e già pubblicabile.
 - `android:allowBackup="true"` ← **da rivedere** (§2.6): l'app conserva un JWT in
   `@capacitor/preferences`.
-- `FileProvider` standard Capacitor, `exported="false"`. Nessun `<queries>`,
-  nessun `AD_ID`.
+- `FileProvider` standard Capacitor, `exported="false"`. Ora ce n'è un secondo,
+  `…localnotifications.fileprovider`, anch'esso `exported="false"`.
+- ⚠️ **Attenzione**: il manifest *sorgente* è pulito, ma il manifest *mergiato*
+  no. `@capgo/capacitor-social-login` porta Google Play Services e con esso un
+  blocco `<queries>` e i permessi `AD_ID` / `ACCESS_ADSERVICES_*`. Vedi §2.4
+  per il set misurato e per la rimozione dell'advertising ID.
 
 ### 0.4 Asset nativi
 
@@ -244,12 +269,64 @@ scheda Play: icona store 512×512 e feature graphic 1024×500 (partendo da
 
 ### 2.4 Review dei permessi
 
-Oggi solo `INTERNET`: situazione ideale, non aggiungere nulla. Dopo il primo
-`bundleRelease` verificare i permessi effettivi dell'artefatto (il manifest
-merger può iniettarne): ispezionare
-`app/build/intermediates/merged_manifests/release/AndroidManifest.xml` o usare
-`aapt2 dump`. Se comparisse `com.google.android.gms.permission.AD_ID`, va
-dichiarato nel Data Safety form o rimosso con `tools:node="remove"`.
+Set atteso dopo il merge (vedi §0.3 per il dettaglio): `INTERNET`,
+`POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`. Nessun permesso
+sensibile: `SCHEDULE_EXACT_ALARM` è rimosso con `tools:node="remove"`.
+
+Dopo il primo `bundleRelease` verificare i permessi **effettivi**
+dell'artefatto, perché il manifest merger può iniettarne altri dai plugin:
+
+```
+frontend/android/gradlew.bat :app:bundleRelease
+# manifest mergiato (il percorso esatto varia con la versione AGP):
+#   app/build/intermediates/merged_manifests/release/**/AndroidManifest.xml
+# alternativa sull'artefatto finale:
+#   aapt2 dump permissions app/build/outputs/bundle/release/app-release.aab
+```
+
+Checklist sul merged manifest:
+- **deve** contenere i quattro permessi attesi;
+- **non deve** contenere `SCHEDULE_EXACT_ALARM` né `USE_EXACT_ALARM`.
+
+**Misurazione reale (assembleDebug, 30/09/2026).** Il merged manifest contiene
+già oggi **molto più** dei quattro permessi attesi: `@capgo/capacitor-social-login`
+tira dentro Google Play Services e con esso un blocco di permessi pubblicitari
+e di credenziali. Set effettivo misurato:
+
+| Permesso | Origine | Azione |
+|---|---|---|
+| `INTERNET` | nostro manifest | ok |
+| `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK` | local-notifications | ok |
+| `VIBRATE` | Play Services / notifiche | ok, install-time |
+| `USE_BIOMETRIC`, `USE_CREDENTIALS`, `USE_FINGERPRINT` | social-login → Credential Manager | ok, install-time |
+| `com.google.android.gms.permission.AD_ID` | Play Services (Privacy Sandbox) | **da decidere** |
+| `ACCESS_ADSERVICES_AD_ID` / `_ATTRIBUTION` / `_TOPICS` / `_CUSTOM_AUDIENCE` | Play Services adservices | **da decidere** |
+| `BIND_GET_INSTALL_REFERRER_SERVICE` | Play Install Referrer | **da decidere** |
+| `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | AndroidX | ok, interno |
+| `SCHEDULE_EXACT_ALARM` | local-notifications | **rimosso** ✓ |
+
+È comparso anche un blocco `<queries>` (anch'esso da Play Services), quindi
+l'affermazione «nessun `<queries>`» di §0.3 non vale più.
+
+**Da fare prima della submission** (indipendente dalle notifiche): Chronogram
+non fa advertising, quindi l'advertising ID va **rimosso** anziché dichiarato
+nel Data Safety form — altrimenti va dichiarata raccolta dell'Advertising ID,
+che è una risposta peggiore in review. Nel manifest dell'app:
+
+```xml
+<uses-permission android:name="com.google.android.gms.permission.AD_ID"
+    tools:node="remove" />
+```
+
+Verificare poi che il login Google continui a funzionare, e ripetere la
+misurazione su `bundleRelease`.
+
+**Data Safety / scheda Play.** Le notifiche periodiche sono **locali**: nessun
+dato lascia il device per consegnarle (la configurazione vive sul backend, la
+consegna la fa `AlarmManager`). Non introducono quindi nuove voci di raccolta
+dati, ma la scheda dovrebbe menzionare i promemoria fra le funzionalità e la
+privacy policy (`docs/privacy_policy.html`) coprire la notifica come trattamento
+locale.
 
 ### 2.5 compileSdk / targetSdk 36 — l'intervento tecnico più delicato
 

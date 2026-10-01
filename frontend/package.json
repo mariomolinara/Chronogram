@@ -18,6 +18,7 @@
     "@capacitor/core": "8.5.0",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/keyboard": "8.0.5",
+    "@capacitor/local-notifications": "8.3.1",
     "@capacitor/preferences": "8.0.1",
     "@capacitor/status-bar": "8.0.3",
     "@capgo/capacitor-social-login": "^8.3.40",

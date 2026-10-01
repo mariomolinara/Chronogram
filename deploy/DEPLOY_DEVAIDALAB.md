@@ -63,6 +63,14 @@ caratteri, `openssl rand -base64 48`), `CORS_ALLOWED_ORIGINS`,
 `APP_CANONICAL_URL`, `ADMIN_EMAIL`/`ADMIN_INITIAL_PASSWORD` (account
 amministratore creato al primo avvio), credenziali mail e chiave LLM.
 
+Opzionali: `GOOGLE_CLIENT_IDS`, `RECAPTCHA_SECRET_KEY` e le tre `VAPID_*` delle
+notifiche push. Le chiavi VAPID si generano una volta per installazione con
+`npx web-push generate-vapid-keys`; la pubblica va anche nel bundle front-end
+(`VITE_VAPID_PUBLIC_KEY`), la privata resta solo in `chronogram.env`. Lasciandole
+vuote la funzione e' spenta: le API `/api/notifications/*` rispondono comunque e
+riportano `configured: false`, quindi il client nasconde l'interruttore. Rigenerare
+la coppia invalida tutte le subscription gia' registrate.
+
 Primo avvio dello stack (il WAR arriverà col primo deploy; intanto parte MySQL,
 che alla prima esecuzione crea database e utente dalle variabili `MYSQL_*`):
 

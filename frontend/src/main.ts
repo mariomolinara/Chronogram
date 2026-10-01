@@ -5,6 +5,7 @@ import { IonicVue } from '@ionic/vue';
 import { createPinia } from 'pinia';
 import { initApiInterceptors } from '@/composables/useApi';
 import { useAuthStore } from '@/store/auth';
+import { syncLocalRemindersFromBackend } from '@/composables/usePushNotifications';
 
 /* Ionic CSS */
 import '@ionic/vue/css/core.css';
@@ -69,4 +70,19 @@ router.isReady().then(async () => {
 
   initApiInterceptors();
   app.mount('#app');
+
+  // ⿧ Rifornimento della coda dei promemoria locali (solo app nativa).
+  //
+  // Le notifiche locali sono istanti concreti schedulati per le prossime ore:
+  // senza un rifornimento periodico la coda si esaurisce e i promemoria
+  // smettono semplicemente di arrivare. L'avvio dell'app è il momento naturale
+  // per ricalcolarla, e non richiede alcun servizio in background.
+  //
+  // DOPO il mount e senza `await`: è una chiamata di rete opzionale e far
+  // aspettare la prima schermata per un promemoria sarebbe un cattivo scambio.
+  // Solo con una sessione attiva, perché l'endpoint è autenticato. Sul web la
+  // funzione esce subito (lì consegna il backend via Web Push).
+  if (authStore.isAuthenticated) {
+    void syncLocalRemindersFromBackend();
+  }
 });

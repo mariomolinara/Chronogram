@@ -89,6 +89,7 @@ Key variables in `.env`:
 | `ADMIN_EMAIL`, `ADMIN_INITIAL_PASSWORD` | Built-in administrator, created on first boot (see [Admin area](#️-admin-area)) |
 | `STATS_ACTIVE_WINDOW_DAYS`, `STATS_REGULAR_WINDOW_DAYS`, `STATS_DISTRIBUTION_DAYS` | Dashboard metric windows (defaults 10 / 7 / 30) |
 | `REGISTRATION_AUTO_APPROVE_DOMAINS`, `REGISTRATION_NOTIFY_ADMIN` | Email domains admitted without approval (default `unicas.it`, sub-domains included) and whether the admin is emailed about pending requests (see [Registration approval](#registration-approval)) |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push keys for the periodic activity reminders — generate with `npx web-push generate-vapid-keys`. Leave empty to disable the feature (the API then reports `configured: false`) |
 
 > Save `.env` with **LF** (Unix) line endings.
 
