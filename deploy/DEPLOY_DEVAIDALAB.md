@@ -65,8 +65,11 @@ amministratore creato al primo avvio), credenziali mail e chiave LLM.
 
 Opzionali: `GOOGLE_CLIENT_IDS`, `RECAPTCHA_SECRET_KEY` e le tre `VAPID_*` delle
 notifiche push. Le chiavi VAPID si generano una volta per installazione con
-`npx web-push generate-vapid-keys`; la pubblica va anche nel bundle front-end
-(`VITE_VAPID_PUBLIC_KEY`), la privata resta solo in `chronogram.env`. Lasciandole
+`npx web-push generate-vapid-keys` — oppure con lo script pronto
+`deploy/vapid-setup.sh`, da eseguire come root sul server, che genera le chiavi,
+le scrive in `chronogram.env` e ricrea il container tomcat. La pubblica viene
+servita ai client da `GET /api/notifications/settings` (niente da ricompilare
+nel front-end), la privata resta solo in `chronogram.env`. Lasciandole
 vuote la funzione e' spenta: le API `/api/notifications/*` rispondono comunque e
 riportano `configured: false`, quindi il client nasconde l'interruttore. Rigenerare
 la coppia invalida tutte le subscription gia' registrate.
