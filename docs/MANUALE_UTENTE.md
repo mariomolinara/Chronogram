@@ -189,7 +189,7 @@ modulo **«New Activity»**.
 | **Duration (minutes)** | Sì | Da 1 a 1440 minuti (1440 = 24 ore) |
 | Details | No | Note aggiuntive, fino a 400 caratteri |
 | **Type of activity** | Sì | Una delle categorie predefinite (vedi sotto) |
-| Pleasantness | No | Da −3 a +3, con i pulsanti − e +. Ogni valore è mostrato con la parola corrispondente — Anguish (−3), Displeasure (−2), Discontent (−1), Neutral (0), Contentment (+1), Pleasure (+2), Joy (+3). Predefinito Neutral (0) |
+| Pleasantness | No | Da −3 a +3, con i pulsanti − e +. Ogni valore è mostrato con la parola corrispondente — Pain (−3), Sorrow (−2), Discomfort (−1), Boredom (0), Relief (+1), Pleasure (+2), Joy (+3). Predefinito Boredom (0) |
 | **Recurrence** | Sì | *Routinary (R)* = abituale · *Exceptional (E)* = eccezionale |
 | Cost (€) | No | Spesa sostenuta |
 | Location | No | At home / At work / Outside / Other |

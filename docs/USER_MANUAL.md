@@ -181,7 +181,7 @@ form opens.
 | **Duration (minutes)** | Yes | From 1 to 1440 minutes (1440 = 24 hours) |
 | Details | No | Extra notes, up to 400 characters |
 | **Type of activity** | Yes | One of the predefined categories (see below) |
-| Pleasantness | No | From −3 to +3, with the − and + buttons. Each value is shown with its emotion word — Anguish (−3), Displeasure (−2), Discontent (−1), Neutral (0), Contentment (+1), Pleasure (+2), Joy (+3). Defaults to Neutral (0) |
+| Pleasantness | No | From −3 to +3, with the − and + buttons. Each value is shown with its emotion word — Pain (−3), Sorrow (−2), Discomfort (−1), Boredom (0), Relief (+1), Pleasure (+2), Joy (+3). Defaults to Boredom (0) |
 | **Recurrence** | Yes | *Routinary (R)* = habitual · *Exceptional (E)* = one-off |
 | Cost (€) | No | What it cost |
 | Location | No | At home / At work / Outside / Other |

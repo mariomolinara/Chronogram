@@ -3,14 +3,15 @@ export const PLEASANTNESS_MAX = 3;
 
 // Parole della scala di piacevolezza: mostrate sempre insieme al numero
 // (es. "Joy (+3)") per evitare ambiguità tra emozioni simili.
+// Scala qualitativa proposta dal prof. Nisticò (ispirata a Scitovsky).
 export const PLEASANTNESS_LABELS: Record<number, string> = {
   3: 'Joy',
   2: 'Pleasure',
-  1: 'Contentment',
-  0: 'Neutral',
-  [-1]: 'Discontent',
-  [-2]: 'Displeasure',
-  [-3]: 'Anguish',
+  1: 'Relief',
+  0: 'Boredom',
+  [-1]: 'Discomfort',
+  [-2]: 'Sorrow',
+  [-3]: 'Pain',
 };
 
 export function formatPleasantness(value: number): string {
