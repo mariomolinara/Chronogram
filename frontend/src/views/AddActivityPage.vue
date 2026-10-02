@@ -184,7 +184,7 @@
                         'negative': activity.pleasantness < 0
                       }"
                   >
-                    {{ activity.pleasantness }}
+                    {{ formatPleasantness(activity.pleasantness) }}
                   </span>
                   <ion-button
                       fill="clear"
@@ -395,6 +395,7 @@ import RequiredMark from '@/components/RequiredMark.vue';
 import FieldError from '@/components/FieldError.vue';
 import FormLegend from '@/components/FormLegend.vue';
 import { useActivityStore } from '@/store/activityStore';
+import { PLEASANTNESS_MIN, PLEASANTNESS_MAX, formatPleasantness } from '@/constants/pleasantness';
 
 const router = useRouter();
 const route = useRoute();
@@ -511,7 +512,7 @@ const aiClass = (field: keyof typeof activity) => ({
 
 const adjustPleasantness = (d: number) => {
   const v = activity.pleasantness + d;
-  if (v >= -3 && v <= 3) activity.pleasantness = v;
+  if (v >= PLEASANTNESS_MIN && v <= PLEASANTNESS_MAX) activity.pleasantness = v;
 };
 
 /* ---------- AI modal ---------- */
@@ -597,7 +598,7 @@ function applyExtraction(data: any): string[] {
 
   const pleasantness = Number(data.pleasantness);
   if (data.pleasantness !== null && data.pleasantness !== undefined && Number.isFinite(pleasantness)) {
-    activity.pleasantness = Math.max(-3, Math.min(3, Math.round(pleasantness)));
+    activity.pleasantness = Math.max(PLEASANTNESS_MIN, Math.min(PLEASANTNESS_MAX, Math.round(pleasantness)));
     filled.push('pleasantness');
   }
 
@@ -962,8 +963,8 @@ ion-item.glass-input.ai-filled{
 }
 .stepper-wrapper{display:flex;align-items:center;gap:var(--space-1)}
 .stepper-value{
-  min-width:28px;text-align:center;
-  font-weight:var(--font-weight-bold);font-size:1.1rem
+  min-width:8em;text-align:center;white-space:nowrap;
+  font-weight:var(--font-weight-bold);font-size:.95rem
 }
 .positive{color:var(--ion-color-success)}
 .negative{color:var(--ion-color-danger)}
