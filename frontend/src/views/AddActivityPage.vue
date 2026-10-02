@@ -956,12 +956,15 @@ ion-item.glass-input.ai-filled{
   padding:var(--space-2) var(--space-4) calc(var(--space-2) + env(safe-area-inset-bottom));
 }
 
-/* Pleasantness */
+/* Pleasantness: flex-wrap, così su schermi stretti lo stepper (allargato
+   dalla parola della scala, es. "Displeasure (-2)") va a capo sotto
+   l'etichetta invece di uscire dallo schermo. */
 .pleasantness-container{
   display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;row-gap:var(--space-1);
   width:100%;padding:var(--space-2) 0
 }
-.stepper-wrapper{display:flex;align-items:center;gap:var(--space-1)}
+.stepper-wrapper{display:flex;align-items:center;gap:var(--space-1);margin-left:auto}
 .stepper-value{
   min-width:8em;text-align:center;white-space:nowrap;
   font-weight:var(--font-weight-bold);font-size:.95rem
